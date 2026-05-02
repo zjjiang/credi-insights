@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Upload {
+  id           String        @id @default(cuid())
+  originalName String
+  imagePath    String
+  imageMonth   String?       // "2026-04"
+  cardLast4    String?       // "0094"
+  status       UploadStatus  @default(PENDING)
+  ocrRawResult String?       // raw OCR JSON for debugging
+  txCount      Int           @default(0)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+}
+
+enum UploadStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model Transaction {
+  id         String    @id @default(cuid())
+  uploadId   String
+  upload     Upload    @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  txDate     DateTime
+  merchant   String
+  amount     Decimal
+  currency   String    @default("CNY")
+  type       TxType    @default(DEBIT)
+  cardLast4  String?
+  txStatus   String?   // "未入账" / "已入账"
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+enum TxType {
+  DEBIT
+  CREDIT
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  icon         String?
+  color        String?
+  isDefault    Boolean       @default(false)
+  sortOrder    Int           @default(0)
+  transactions Transaction[]
+}
