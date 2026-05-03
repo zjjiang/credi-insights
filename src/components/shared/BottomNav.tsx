@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Settings } from "lucide-react";
+import { Home, BarChart2, Settings } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "首页", icon: Home },
+  { href: "/analysis", label: "分析", icon: BarChart2 },
   { href: "/settings", label: "设置", icon: Settings },
 ];
 

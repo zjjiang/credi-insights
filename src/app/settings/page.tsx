@@ -15,6 +15,8 @@ interface ApiRule {
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("")
+  const [baseUrl, setBaseUrl] = useState("")
+  const [aiModel, setAiModel] = useState("")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [rules, setRules] = useState<ApiRule[]>([])
@@ -25,6 +27,8 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then((j) => {
       if (j.data?.ANTHROPIC_API_KEY) setApiKey(j.data.ANTHROPIC_API_KEY)
+      if (j.data?.AI_BASE_URL) setBaseUrl(j.data.AI_BASE_URL)
+      if (j.data?.AI_MODEL) setAiModel(j.data.AI_MODEL)
     })
     fetch("/api/rules").then((r) => r.json()).then((j) => { if (j.success) setRules(j.data) })
     fetch("/api/categories").then((r) => r.json()).then((j) => { if (j.success) setCategories(j.data) })
@@ -35,7 +39,7 @@ export default function SettingsPage() {
     await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ANTHROPIC_API_KEY: apiKey }),
+      body: JSON.stringify({ ANTHROPIC_API_KEY: apiKey, AI_BASE_URL: baseUrl, AI_MODEL: aiModel }),
     })
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -85,8 +89,20 @@ export default function SettingsPage() {
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-ant-api03-..."
+          placeholder="API Key（Anthropic 或阿里云百炼）"
           className="w-full rounded border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <input
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          placeholder="Base URL（百炼填 https://dashscope.aliyuncs.com/compatible-mode/v1）"
+          className="w-full rounded border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <input
+          value={aiModel}
+          onChange={(e) => setAiModel(e.target.value)}
+          placeholder="模型名（如 qwen-plus、qwen-turbo）"
+          className="w-full rounded border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
         <button onClick={saveKey} disabled={saving || !apiKey}
           className="rounded bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">

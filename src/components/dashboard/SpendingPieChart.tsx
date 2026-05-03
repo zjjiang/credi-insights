@@ -4,7 +4,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
@@ -119,29 +118,37 @@ export function SpendingPieChart({ byCategory }: SpendingPieChartProps) {
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="amount"
-          nameKey="name"
-          cx="50%"
-          cy="45%"
-          outerRadius={90}
-          labelLine={false}
-          label={CustomLabel as React.ComponentProps<typeof Pie>["label"]}
-        >
-          {data.map((_, index) => (
-            <Cell key={index} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(v) => formatAmount(Number(v))} />
-        <Legend
-          content={
-            CustomLegend as React.ComponentProps<typeof Legend>["content"]
-          }
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="amount"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            outerRadius={90}
+            labelLine={false}
+            label={CustomLabel as React.ComponentProps<typeof Pie>["label"]}
+          >
+            {data.map((_, index) => (
+              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(v) => formatAmount(Number(v))} />
+        </PieChart>
+      </ResponsiveContainer>
+      <ul className="flex flex-col gap-1 text-xs px-2 mt-2">
+        {data.map((entry, index) => (
+          <li key={entry.name} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: COLORS[index % COLORS.length] }} />
+              <span>{entry.icon} {entry.name}</span>
+            </span>
+            <span className="text-muted-foreground">{formatAmount(entry.amount)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

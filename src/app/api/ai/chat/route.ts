@@ -1,51 +1,51 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/db'
-import { getSetting } from '@/lib/settings'
+import { getAiClient } from '@/lib/ai-client'
+import type OpenAI from 'openai'
 
-async function getClient() {
-  const apiKey = (await getSetting('ANTHROPIC_API_KEY')) ?? process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('未配置 Anthropic API Key，请前往设置页面配置')
-  return new Anthropic({ apiKey })
-}
-
-const tools: Anthropic.Tool[] = [
+const tools: OpenAI.Chat.ChatCompletionTool[] = [
   {
-    name: 'query_transactions',
-    description: '查询交易数据用于回答问题',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        month: { type: 'string', description: 'YYYY-MM 格式' },
-        merchantContains: { type: 'string' },
-        type: { type: 'string', enum: ['DEBIT', 'CREDIT'] },
-        limit: { type: 'number' },
+    type: 'function',
+    function: {
+      name: 'query_transactions',
+      description: '查询交易数据用于回答问题',
+      parameters: {
+        type: 'object',
+        properties: {
+          month: { type: 'string', description: 'YYYY-MM 格式' },
+          merchantContains: { type: 'string' },
+          type: { type: 'string', enum: ['DEBIT', 'CREDIT'] },
+          limit: { type: 'number' },
+        },
       },
     },
   },
   {
-    name: 'bulk_update_category',
-    description: '批量修改符合条件的交易分类或用途',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        filter: {
-          type: 'object',
-          properties: {
-            merchantContains: { type: 'string' },
-            month: { type: 'string' },
-            categoryId: { type: 'string' },
+    type: 'function',
+    function: {
+      name: 'bulk_update_category',
+      description: '批量修改符合条件的交易分类或用途',
+      parameters: {
+        type: 'object',
+        properties: {
+          filter: {
+            type: 'object',
+            properties: {
+              merchantContains: { type: 'string' },
+              month: { type: 'string' },
+              categoryId: { type: 'string' },
+            },
+          },
+          update: {
+            type: 'object',
+            properties: {
+              categoryId: { type: 'string' },
+              purpose: { type: 'string' },
+            },
           },
         },
-        update: {
-          type: 'object',
-          properties: {
-            categoryId: { type: 'string' },
-            purpose: { type: 'string' },
-          },
-        },
+        required: ['filter', 'update'],
       },
-      required: ['filter', 'update'],
     },
   },
 ]
@@ -98,6 +98,7 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<un
 export async function POST(request: Request) {
   try {
     const { messages, context } = await request.json()
+    const { client, model } = await getAiClient()
 
     const systemPrompt = `你是一个信用卡账单分析助手。你可以查询交易数据、回答消费问题、批量修改交易分类。${
       context?.currentMonth ? `当前查看的月份是 ${context.currentMonth}。` : ''
@@ -108,35 +109,28 @@ export async function POST(request: Request) {
         const enc = new TextEncoder()
         const send = (data: unknown) => controller.enqueue(enc.encode(`data: ${JSON.stringify(data)}\n\n`))
 
-        let msgs: Anthropic.MessageParam[] = messages
+        let msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [
+          { role: 'system', content: systemPrompt },
+          ...messages,
+        ]
 
-        // agentic loop
-        const client = await getClient()
         for (let i = 0; i < 5; i++) {
-          const response = await client.messages.create({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 1024,
-            system: systemPrompt,
-            tools,
-            messages: msgs,
-            stream: false,
-          })
+          const response = await client.chat.completions.create({ model, max_tokens: 1024, tools, messages: msgs })
+          const msg = response.choices[0].message
 
-          for (const block of response.content) {
-            if (block.type === 'text') {
-              send({ type: 'text', delta: block.text })
-            } else if (block.type === 'tool_use') {
-              const toolResult = await runTool(block.name, block.input as Record<string, unknown>)
-              send({ type: 'tool_result', name: block.name, result: toolResult })
-              msgs = [
-                ...msgs,
-                { role: 'assistant', content: response.content },
-                { role: 'user', content: [{ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(toolResult) }] },
-              ]
-            }
+          if (msg.content) send({ type: 'text', delta: msg.content })
+
+          const toolCalls = msg.tool_calls ?? []
+          if (toolCalls.length === 0) break
+
+          msgs = [...msgs, msg]
+          for (const tc of toolCalls) {
+            if (tc.type !== 'function') continue
+            const input = JSON.parse(tc.function.arguments) as Record<string, unknown>
+            const result = await runTool(tc.function.name, input)
+            send({ type: 'tool_result', name: tc.function.name, result })
+            msgs.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) })
           }
-
-          if (response.stop_reason !== 'tool_use') break
         }
 
         send('[DONE]')

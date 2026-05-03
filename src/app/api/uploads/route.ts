@@ -79,7 +79,6 @@ export async function POST(request: Request) {
         const classifications = await classifyTransactions(
           createdTxs.map((t) => ({ id: t.id, merchant: t.merchant, amount: Number(t.amount) })),
           rules.map((r) => ({ description: r.description, categoryId: r.categoryId, categoryName: r.category.name })),
-          apiKey,
         )
         for (const { txId, categoryId } of classifications) {
           await prisma.transaction.update({ where: { id: txId }, data: { categoryId } })

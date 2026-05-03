@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, RefreshCw } from "lucide-react";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { SpendingPieChart } from "@/components/dashboard/SpendingPieChart";
 import type { ApiUpload, ApiTransaction, ApiCategory, DashboardData } from "@/lib/api-types";
@@ -23,6 +23,9 @@ export function UploadBatchCard({ batch, categories, onDeleted }: UploadBatchCar
   const [loadingStats, setLoadingStats] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [reclassifying, setReclassifying] = useState(false);
+  const [reclassifyResult, setReclassifyResult] = useState<number | null>(null);
+  const [reclassifyError, setReclassifyError] = useState<string | null>(null);
 
   const periodLabel = batch.billingStart && batch.billingEnd
     ? `${batch.billingStart.slice(0, 10)} ~ ${batch.billingEnd.slice(0, 10)}`
@@ -50,6 +53,23 @@ export function UploadBatchCard({ batch, categories, onDeleted }: UploadBatchCar
       if (json.success) setStats(json.data);
       setLoadingStats(false);
     }
+  }
+
+  async function handleReclassify() {
+    setReclassifying(true);
+    setReclassifyResult(null);
+    setReclassifyError(null);
+    const res = await fetch(`/api/uploads/${batch.id}/reclassify`, { method: "POST" });
+    const json = await res.json();
+    if (json.success) {
+      setReclassifyResult(json.data.classified);
+      const txRes = await fetch(`/api/uploads/${batch.id}/transactions`);
+      const txJson = await txRes.json();
+      if (txJson.success) setTransactions(txJson.data);
+    } else {
+      setReclassifyError(json.error ?? "分类失败");
+    }
+    setReclassifying(false);
   }
 
   async function handleDelete() {
@@ -83,7 +103,17 @@ export function UploadBatchCard({ batch, categories, onDeleted }: UploadBatchCar
       </CardHeader>
 
       <CardContent>
+        {reclassifyResult !== null && (
+          <p className="mb-2 text-xs text-green-600">已分类 {reclassifyResult} 笔</p>
+        )}
+        {reclassifyError && (
+          <p className="mb-2 text-xs text-destructive">{reclassifyError}</p>
+        )}
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={handleReclassify} disabled={reclassifying}>
+            <RefreshCw className={`h-3.5 w-3.5 ${reclassifying ? "animate-spin" : ""}`} />
+            {reclassifying ? "分类中..." : "重新分类"}
+          </Button>
           <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs" onClick={handleExpand} disabled={loadingTx}>
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             {loadingTx ? "加载中..." : expanded ? "收起" : "展开"}
@@ -117,6 +147,7 @@ export function UploadBatchCard({ batch, categories, onDeleted }: UploadBatchCar
                 <p className="py-8 text-center text-sm text-muted-foreground">加载中...</p>
               ) : stats ? (
                 <div className="space-y-3">
+                  <SpendingPieChart byCategory={stats.byCategory} />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">本期支出</p>
@@ -127,7 +158,6 @@ export function UploadBatchCard({ batch, categories, onDeleted }: UploadBatchCar
                       <p className="text-lg font-semibold text-green-600">¥{stats.totalCredit.toFixed(2)}</p>
                     </div>
                   </div>
-                  <SpendingPieChart byCategory={stats.byCategory} />
                 </div>
               ) : null
             )}
