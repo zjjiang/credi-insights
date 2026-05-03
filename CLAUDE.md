@@ -18,16 +18,20 @@ No test runner is configured.
 
 ## Architecture
 
-**Credi Insights** is a mobile-first Next.js PWA for Chinese credit card bill analysis (`lang="zh-CN"`). Users upload statement images → OCR extracts transactions → analytics dashboard shows spending breakdowns.
+**Credi Insights** is a mobile-first Next.js PWA for Chinese credit card bill analysis (`lang="zh-CN"`). Users upload CMB (招商银行) `.msg` email statements → Python script parses transactions → AI auto-classifies → analytics shown per bill.
 
 **Data flow:**
-1. `POST /api/uploads` — accepts image, creates `Upload` record (status: PENDING)
-2. OCR pipeline (`src/lib/ocr/`) processes image → status transitions PENDING → PROCESSING → DONE/FAILED
-3. Parsed `Transaction` records are linked to the `Upload`
-4. `GET /api/dashboard` aggregates transactions for charts
+1. `POST /api/uploads` — accepts `.msg` file, saves to `data/uploads/`, spawns `scripts/parse_msg.py` via `src/lib/msg/parser.ts`
+2. Python script extracts transactions + billing period (billingStart/billingEnd/dueDate) from HTML email body
+3. If `ANTHROPIC_API_KEY` is set and rules exist, `src/lib/ai-classify.ts` calls Claude Haiku to auto-tag categories
+4. Per-bill stats available via `GET /api/dashboard?uploadId=xxx`
 
-**Database:** SQLite via Prisma 6. Three models: `Upload`, `Transaction`, `Category`. Prisma client is generated to `src/generated/prisma/` (non-standard path — import from there, not `@prisma/client`). Singleton in `src/lib/db.ts`.
+**Database:** MySQL via Prisma 6. Five models: `Upload`, `Transaction`, `Category`, `Rule`, `Setting`. Prisma client generated to `src/generated/prisma/` — import from there, not `@prisma/client`. Singleton in `src/lib/db.ts`.
 
-**API:** Next.js Route Handlers under `src/app/api/`. All responses follow a consistent envelope (see `src/lib/api-types.ts`).
+**Python dependency:** `extract-msg` must be installed in `.venv/`. Set `PYTHON_BIN` in `.env` to the venv Python path. Run `pip install -r scripts/requirements.txt` inside the venv.
 
-**UI:** shadcn/ui + Base UI (`@base-ui/react`), Tailwind CSS v4, Recharts for charts, Zod v4 for validation.
+**API:** Next.js Route Handlers under `src/app/api/`. All responses use `{ success, data?, error? }` envelope (see `src/lib/api-types.ts`).
+
+**UI:** 3 pages — `/` (home: upload + history), `/settings` (AI key + classification rules), `/admin/transactions` (hidden full-edit table). shadcn/ui + Tailwind CSS v4, Recharts for charts. AI sidebar (`src/components/ai/`) uses SSE streaming from `/api/ai/chat`.
+
+**Settings stored in DB:** `ANTHROPIC_API_KEY` is saved via `POST /api/settings` and read at runtime via `src/lib/settings.ts` — not from `.env`.
