@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/shared/BottomNav";
+import { AiProvider } from "@/lib/ai-context";
+import { AiSidebar } from "@/components/ai/AiSidebar";
+import { AiToggleButton } from "@/components/ai/AiToggleButton";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Credi Insights",
@@ -21,16 +21,16 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <main className="flex-1 pb-20">{children}</main>
-        <BottomNav />
+        <AiProvider>
+          <main className="flex-1 pb-20">{children}</main>
+          <BottomNav />
+          <AiSidebar />
+          <AiToggleButton />
+        </AiProvider>
       </body>
     </html>
   );

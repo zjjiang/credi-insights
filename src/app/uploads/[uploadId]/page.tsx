@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { TransactionList } from "@/components/transactions/TransactionList";
-import { ProcessingStatus } from "@/components/upload/ProcessingStatus";
+
+
 import type { ApiUpload, ApiCategory } from "@/lib/api-types";
 
 async function getUpload(id: string): Promise<ApiUpload | null> {
@@ -58,8 +59,8 @@ export default async function UploadDetailPage({
 
       <div className="p-4">
         {upload.status !== "DONE" && (
-          <div className="mb-4">
-            <ProcessingStatus status={upload.status.toLowerCase() as "pending" | "processing" | "done" | "failed"} />
+          <div className="mb-4 text-sm text-muted-foreground">
+            {upload.status === "FAILED" ? "解析失败" : "处理中..."}
           </div>
         )}
         <TransactionList

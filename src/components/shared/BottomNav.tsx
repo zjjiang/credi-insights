@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Upload, LayoutDashboard, History, Tag } from "lucide-react";
+import { Home, Settings } from "lucide-react";
 
 const navItems = [
-  { href: "/upload", label: "上传", icon: Upload },
-  { href: "/dashboard", label: "统计", icon: LayoutDashboard },
-  { href: "/history", label: "历史", icon: History },
-  { href: "/categories", label: "分类", icon: Tag },
+  { href: "/", label: "首页", icon: Home },
+  { href: "/settings", label: "设置", icon: Settings },
 ];
 
 export function BottomNav() {

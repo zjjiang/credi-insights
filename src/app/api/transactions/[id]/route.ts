@@ -6,9 +6,12 @@ const updateSchema = z.object({
   merchant: z.string().min(1).optional(),
   amount: z.number().positive().optional(),
   categoryId: z.string().nullable().optional(),
+  purpose: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   type: z.enum(['DEBIT', 'CREDIT']).optional(),
   txStatus: z.string().nullable().optional(),
+  txDate: z.string().optional(),
+  currency: z.string().optional(),
 })
 
 export async function PATCH(

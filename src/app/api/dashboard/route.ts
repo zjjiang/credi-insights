@@ -15,19 +15,24 @@ function toISODate(d: Date): string {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const uploadId = searchParams.get('uploadId')
     const month = searchParams.get('month')
 
-    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    let where: Record<string, unknown> = {}
+    if (uploadId) {
+      where = { uploadId }
+    } else if (month && /^\d{4}-\d{2}$/.test(month)) {
+      const { start, end } = getMonthBounds(month)
+      where = { txDate: { gte: start, lt: end } }
+    } else {
       return NextResponse.json(
-        { success: false, error: 'month query param required (format: 2026-04)' },
+        { success: false, error: 'uploadId or month query param required' },
         { status: 400 },
       )
     }
 
-    const { start, end } = getMonthBounds(month)
-
     const transactions = await prisma.transaction.findMany({
-      where: { txDate: { gte: start, lt: end } },
+      where,
       include: { category: true },
     })
 

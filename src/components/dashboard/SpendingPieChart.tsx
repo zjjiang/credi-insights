@@ -11,7 +11,7 @@ import {
 
 interface CategoryData {
   categoryName: string;
-  icon: string;
+  icon: string | null;
   amount: number;
 }
 

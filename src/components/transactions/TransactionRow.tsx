@@ -9,10 +9,12 @@ import type { ApiTransaction, ApiCategory } from "@/lib/api-types";
 interface TransactionRowProps {
   transaction: ApiTransaction;
   categories: ApiCategory[];
+  selected?: boolean;
+  onSelect?: () => void;
   onDelete: (id: string) => void;
 }
 
-export function TransactionRow({ transaction, categories, onDelete }: TransactionRowProps) {
+export function TransactionRow({ transaction, categories, selected, onSelect, onDelete }: TransactionRowProps) {
   const [merchant, setMerchant] = useState(transaction.merchant);
   const [editing, setEditing] = useState(false);
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? "");
@@ -20,10 +22,10 @@ export function TransactionRow({ transaction, categories, onDelete }: Transactio
   const [deleting, setDeleting] = useState(false);
 
   const dt = new Date(transaction.txDate);
-  const dateStr = `${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+  const dateStr = `${dt.getMonth() + 1}/${dt.getDate()}`;
   const isDebit = transaction.type === "DEBIT";
 
-  async function patchField(field: string, value: string) {
+  async function patchField(field: string, value: unknown) {
     await fetch(`/api/transactions/${transaction.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -39,7 +41,7 @@ export function TransactionRow({ transaction, categories, onDelete }: Transactio
   async function handleCategoryChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value;
     setCategoryId(val);
-    await patchField("categoryId", val);
+    await patchField("categoryId", val || null);
   }
 
   async function handleNoteBlur() {
@@ -55,10 +57,13 @@ export function TransactionRow({ transaction, categories, onDelete }: Transactio
   const category = categories.find((c) => c.id === categoryId);
 
   return (
-    <div className="flex flex-col gap-1.5 border-b py-3 last:border-0">
-      <div className="flex items-center justify-between gap-2">
+    <div className={`flex flex-col gap-1.5 border-b py-3 last:border-0 ${selected ? "bg-primary/5" : ""}`}>
+      <div className="flex items-center gap-2">
+        {onSelect && (
+          <input type="checkbox" checked={!!selected} onChange={onSelect} className="shrink-0" />
+        )}
         <span className="text-xs text-muted-foreground">{dateStr}</span>
-        <span className={`text-sm font-semibold ${isDebit ? "text-red-500" : "text-green-600"}`}>
+        <span className={`ml-auto text-sm font-semibold ${isDebit ? "text-red-500" : "text-green-600"}`}>
           {isDebit ? "-" : "+"}¥{Number(transaction.amount).toFixed(2)}
         </span>
       </div>
@@ -73,10 +78,7 @@ export function TransactionRow({ transaction, categories, onDelete }: Transactio
             onBlur={handleMerchantBlur}
           />
         ) : (
-          <button
-            className="flex-1 text-left text-sm font-medium hover:text-primary"
-            onClick={() => setEditing(true)}
-          >
+          <button className="flex-1 text-left text-sm font-medium hover:text-primary" onClick={() => setEditing(true)}>
             {merchant}
           </button>
         )}
@@ -95,22 +97,11 @@ export function TransactionRow({ transaction, categories, onDelete }: Transactio
         >
           <option value="">未分类</option>
           {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.icon} {c.name}
-            </option>
+            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
           ))}
         </select>
-        {category && (
-          <Badge variant="secondary" className="text-xs">
-            {category.icon} {category.name}
-          </Badge>
-        )}
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="text-muted-foreground transition-colors hover:text-destructive"
-          aria-label="删除"
-        >
+        {category && <Badge variant="secondary" className="text-xs">{category.icon} {category.name}</Badge>}
+        <button onClick={handleDelete} disabled={deleting} className="text-muted-foreground hover:text-destructive" aria-label="删除">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
