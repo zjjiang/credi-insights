@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BarChart2, Settings } from "lucide-react";
+import { Home, Settings } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "首页", icon: Home },
-  { href: "/analysis", label: "分析", icon: BarChart2 },
   { href: "/settings", label: "设置", icon: Settings },
 ];
 
@@ -17,7 +16,8 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background">
       <div className="flex h-16 items-center justify-around">
         {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          const active =
+            href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
