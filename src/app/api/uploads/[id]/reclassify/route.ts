@@ -27,8 +27,9 @@ export async function POST(
 
     const results = await classifyTransactions(transactions, ruleInputs)
 
-    const validIds = new Set(transactions.map((t) => t.id))
-    const validResults = results.filter((r) => validIds.has(r.txId))
+    const validTxIds = new Set(transactions.map((t) => t.id))
+    const validCategoryIds = new Set(rules.map((r) => r.categoryId))
+    const validResults = results.filter((r) => validTxIds.has(r.txId) && validCategoryIds.has(r.categoryId))
 
     await Promise.all(
       validResults.map((r) => prisma.transaction.update({ where: { id: r.txId }, data: { categoryId: r.categoryId } })),

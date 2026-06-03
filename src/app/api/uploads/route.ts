@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         prisma.rule.findMany({ where: { enabled: true }, include: { category: true }, orderBy: { priority: 'desc' } }),
       ])
       if (apiKey && rules.length > 0) {
+        const validCategoryIds = new Set(rules.map((r) => r.categoryId))
         const createdTxs = await prisma.transaction.findMany({
           where: { uploadId: upload.id },
           select: { id: true, merchant: true, amount: true },
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
           rules.map((r) => ({ description: r.description, categoryId: r.categoryId, categoryName: r.category.name })),
         )
         for (const { txId, categoryId } of classifications) {
+          if (!validCategoryIds.has(categoryId)) continue
           await prisma.transaction.update({ where: { id: txId }, data: { categoryId } })
         }
       }
