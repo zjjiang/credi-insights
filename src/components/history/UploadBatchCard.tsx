@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Trash2, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, RefreshCw, Download } from "lucide-react";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { SpendingPieChart } from "@/components/dashboard/SpendingPieChart";
 import type {
@@ -39,6 +39,7 @@ export function UploadBatchCard({
   const [reclassifying, setReclassifying] = useState(false);
   const [reclassifyResult, setReclassifyResult] = useState<number | null>(null);
   const [reclassifyError, setReclassifyError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const [expandedMerchant, setExpandedMerchant] = useState<string | null>(null);
   const [assigningMerchant, setAssigningMerchant] = useState<string | null>(
     null,
@@ -147,6 +148,24 @@ export function UploadBatchCard({
     onDeleted(batch.id);
   }
 
+  async function handleDownloadReport() {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/uploads/${batch.id}/report`);
+      if (!res.ok) throw new Error("下载失败");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `消费报告_${batch.billingStart?.slice(0, 10) ?? batch.imageMonth ?? "report"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent
+    }
+    setDownloading(false);
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -193,6 +212,18 @@ export function UploadBatchCard({
           <p className="mb-2 text-xs text-destructive">{reclassifyError}</p>
         )}
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs"
+            onClick={handleDownloadReport}
+            disabled={downloading || batch.status !== "DONE"}
+          >
+            <Download
+              className={`h-3.5 w-3.5 ${downloading ? "animate-bounce" : ""}`}
+            />
+            {downloading ? "生成中..." : "报告"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
