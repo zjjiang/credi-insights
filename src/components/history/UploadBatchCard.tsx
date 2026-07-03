@@ -151,7 +151,9 @@ export function UploadBatchCard({
   async function handleDownloadReport() {
     setDownloading(true);
     try {
-      const res = await fetch(`/api/uploads/${batch.id}/report`);
+      const res = await fetch(`/api/uploads/${batch.id}/report`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("下载失败");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

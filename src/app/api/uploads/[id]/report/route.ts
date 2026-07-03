@@ -3,6 +3,8 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import { prisma } from '@/lib/db'
 import { SpendingReportDocument } from '@/lib/report/SpendingReportDocument'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -99,6 +101,7 @@ export async function GET(
     return new Response(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/pdf',
+        'Cache-Control': 'no-store',
         'Content-Disposition': `attachment; filename="report_${billingStart}_${billingEnd}.pdf"`,
       },
     })
