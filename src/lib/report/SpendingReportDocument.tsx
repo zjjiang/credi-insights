@@ -4,7 +4,6 @@ import { existsSync } from 'fs'
 
 const fontCandidates = [
   path.join(process.cwd(), 'public/fonts/NotoSansSC-Regular.ttf'),
-  path.join(process.cwd(), 'public/fonts/STHeitiMedium.ttf'),
   '/Library/Fonts/Arial Unicode.ttf',
 ]
 
