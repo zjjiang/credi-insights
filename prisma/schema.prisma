@@ -35,22 +35,25 @@ enum UploadStatus {
 }
 
 model Transaction {
-  id         String    @id @default(cuid())
-  uploadId   String
-  upload     Upload    @relation(fields: [uploadId], references: [id], onDelete: Cascade)
-  txDate     DateTime
-  merchant   String
-  amount     Decimal
-  currency   String    @default("CNY")
-  type       TxType    @default(DEBIT)
-  cardLast4  String?
-  txStatus   String?   // "未入账" / "已入账"
-  categoryId String?
-  category   Category? @relation(fields: [categoryId], references: [id])
-  purpose    String?
-  note       String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  uploadId    String?
+  upload      Upload?   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  txDate      DateTime
+  txTime      String?   // 精确交易时间 "HH:mm:ss"（日推送提供，月账单无）
+  merchant    String
+  amount      Decimal
+  currency    String    @default("CNY")
+  type        TxType    @default(DEBIT)
+  cardLast4   String?
+  txStatus    String?   // "未入账" / "已入账"
+  source      String    @default("bill") // "bill"（月账单）| "daily"（日推送）
+  fingerprint String?   @unique // 去重指纹 `${date}_${cardLast4}_${amount}`
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  purpose     String?
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 enum TxType {
