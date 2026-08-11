@@ -4,6 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Development Workflow (铁律 / non-negotiable)
+
+These three rules are mandatory for every feature or fix. No exceptions without the user explicitly waiving a rule for that specific task.
+
+1. **OpenSpec first.** Every change starts with an OpenSpec proposal under `openspec/changes/<name>/` (proposal → specs → design → tasks). Validate with `npx openspec validate <name> --strict` before writing code. No implementation before the spec is written and validated.
+2. **TDD.** Write the failing test first (RED), implement to green (GREEN), then refactor. Never write implementation code before its test exists. Run the full test suite before opening a PR.
+3. **PR-only merge.** All work lands via a feature branch + Pull Request into `main`. Never commit or push directly to `main`. Branch → commit → push `-u` → `gh pr create`.
+
+> ⚠️ Test runner not yet configured (see below). TDD rule is blocked until one is set up — Vitest is the standard fit for this Next.js + TypeScript stack. Set it up before the next feature.
+
 ## Commands
 
 ```bash
