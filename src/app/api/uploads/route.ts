@@ -6,6 +6,7 @@ import { parseMsgFile } from "@/lib/msg/parser";
 import { getSetting } from "@/lib/settings";
 import { classifyTransactions } from "@/lib/ai-classify";
 import { makeFingerprint } from "@/lib/fingerprint";
+import { didGraduateFromDaily } from "@/lib/graduation";
 
 export async function POST(request: Request) {
   try {
@@ -59,11 +60,12 @@ export async function POST(request: Request) {
 
       const existing = await prisma.transaction.findUnique({
         where: { fingerprint },
-        select: { id: true },
+        select: { id: true, source: true },
       });
 
       if (existing) {
-        // 覆盖元数据，source 归为月账单，绑定到本次 upload；不动 categoryId
+        // 覆盖元数据，source 归为月账单，绑定到本次 upload；不动 categoryId。
+        // 若原记录来自日推，标记 graduatedFromDaily 供月账单 Tab 高亮。
         await prisma.transaction.update({
           where: { id: existing.id },
           data: {
@@ -76,6 +78,7 @@ export async function POST(request: Request) {
             cardLast4,
             txStatus: t.txStatus,
             source: "bill",
+            graduatedFromDaily: didGraduateFromDaily(existing.source),
           },
         });
       } else {

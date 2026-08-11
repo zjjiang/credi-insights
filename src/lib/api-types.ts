@@ -19,6 +19,7 @@ export interface ApiTransaction {
   cardLast4: string | null;
   txStatus: string | null;
   source: string;
+  graduatedFromDaily: boolean;
   fingerprint: string | null;
   categoryId: string | null;
   category: ApiCategory | null;
