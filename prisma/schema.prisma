@@ -47,6 +47,7 @@ model Transaction {
   cardLast4   String?
   txStatus    String?   // "未入账" / "已入账"
   source      String    @default("bill") // "bill"（月账单）| "daily"（日推送）
+  graduatedFromDaily Boolean @default(false) // 曾由日推入库、后被月账单对账（供 UI 高亮）
   fingerprint String?   @unique // 去重指纹 `${date}_${cardLast4}_${amount}`
   categoryId  String?
   category    Category? @relation(fields: [categoryId], references: [id])

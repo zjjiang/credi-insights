@@ -14,7 +14,13 @@ interface TransactionRowProps {
   onDelete: (id: string) => void;
 }
 
-export function TransactionRow({ transaction, categories, selected, onSelect, onDelete }: TransactionRowProps) {
+export function TransactionRow({
+  transaction,
+  categories,
+  selected,
+  onSelect,
+  onDelete,
+}: TransactionRowProps) {
   const [merchant, setMerchant] = useState(transaction.merchant);
   const [editing, setEditing] = useState(false);
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? "");
@@ -35,7 +41,8 @@ export function TransactionRow({ transaction, categories, selected, onSelect, on
 
   async function handleMerchantBlur() {
     setEditing(false);
-    if (merchant !== transaction.merchant) await patchField("merchant", merchant);
+    if (merchant !== transaction.merchant)
+      await patchField("merchant", merchant);
   }
 
   async function handleCategoryChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -57,13 +64,22 @@ export function TransactionRow({ transaction, categories, selected, onSelect, on
   const category = categories.find((c) => c.id === categoryId);
 
   return (
-    <div className={`flex flex-col gap-1.5 border-b py-3 last:border-0 ${selected ? "bg-primary/5" : ""}`}>
+    <div
+      className={`flex flex-col gap-1.5 border-b py-3 last:border-0 ${selected ? "bg-primary/5" : ""}`}
+    >
       <div className="flex items-center gap-2">
         {onSelect && (
-          <input type="checkbox" checked={!!selected} onChange={onSelect} className="shrink-0" />
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onSelect}
+            className="shrink-0"
+          />
         )}
         <span className="text-xs text-muted-foreground">{dateStr}</span>
-        <span className={`ml-auto text-sm font-semibold ${isDebit ? "text-red-500" : "text-green-600"}`}>
+        <span
+          className={`ml-auto text-sm font-semibold ${isDebit ? "text-red-500" : "text-green-600"}`}
+        >
           {isDebit ? "-" : "+"}¥{Number(transaction.amount).toFixed(2)}
         </span>
       </div>
@@ -78,12 +94,29 @@ export function TransactionRow({ transaction, categories, selected, onSelect, on
             onBlur={handleMerchantBlur}
           />
         ) : (
-          <button className="flex-1 text-left text-sm font-medium hover:text-primary" onClick={() => setEditing(true)}>
+          <button
+            className="flex-1 text-left text-sm font-medium hover:text-primary"
+            onClick={() => setEditing(true)}
+          >
             {merchant}
           </button>
         )}
+        {transaction.graduatedFromDaily && (
+          <Badge
+            variant="outline"
+            className="border-blue-300 text-xs text-blue-600"
+            title="这笔由日推送带标签进入，月账单对账时保留了原分类"
+          >
+            日推带标
+          </Badge>
+        )}
         {transaction.txStatus && (
-          <Badge variant={transaction.txStatus === "已入账" ? "outline" : "secondary"} className="text-xs">
+          <Badge
+            variant={
+              transaction.txStatus === "已入账" ? "outline" : "secondary"
+            }
+            className="text-xs"
+          >
             {transaction.txStatus}
           </Badge>
         )}
@@ -97,11 +130,22 @@ export function TransactionRow({ transaction, categories, selected, onSelect, on
         >
           <option value="">未分类</option>
           {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            <option key={c.id} value={c.id}>
+              {c.icon} {c.name}
+            </option>
           ))}
         </select>
-        {category && <Badge variant="secondary" className="text-xs">{category.icon} {category.name}</Badge>}
-        <button onClick={handleDelete} disabled={deleting} className="text-muted-foreground hover:text-destructive" aria-label="删除">
+        {category && (
+          <Badge variant="secondary" className="text-xs">
+            {category.icon} {category.name}
+          </Badge>
+        )}
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="text-muted-foreground hover:text-destructive"
+          aria-label="删除"
+        >
           <Trash2 className="h-4 w-4" />
         </button>
       </div>

@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
-import { runDailyIngest } from '@/lib/imap/ingest'
+import { NextResponse } from "next/server";
+import { runDailyIngest } from "@/lib/imap/ingest";
+import { isIngestAuthorized } from "@/lib/imap/ingest-auth";
 
 // 抓取可能耗时（IMAP 往返 + AI 分类），禁用静态化并放宽超时
-export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * POST /api/ingest/daily
@@ -12,23 +13,20 @@ export const maxDuration = 60
  */
 export async function POST(request: Request) {
   try {
-    const secret = process.env.INGEST_SECRET
-    if (secret) {
-      const url = new URL(request.url)
-      const provided =
-        request.headers.get('x-ingest-secret') ?? url.searchParams.get('secret')
-      if (provided !== secret) {
-        return NextResponse.json(
-          { success: false, error: 'Unauthorized' },
-          { status: 401 },
-        )
-      }
+    if (!isIngestAuthorized(request)) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
-    const result = await runDailyIngest()
-    return NextResponse.json({ success: true, data: result })
+    const result = await runDailyIngest();
+    return NextResponse.json({ success: true, data: result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Ingest failed'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Ingest failed";
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 },
+    );
   }
 }
