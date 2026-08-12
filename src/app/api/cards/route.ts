@@ -147,7 +147,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      data: cardsWithStats,
+      data: { cards: cardsWithStats },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "查询卡片失败";

@@ -2,13 +2,7 @@ import { prisma } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { classifyTransactions } from "@/lib/ai-classify";
 import { makeFingerprint } from "@/lib/fingerprint";
-import {
-  getImapConfig,
-  getCursor,
-  setCursor,
-  fetchNewEmails,
-  SUBJECT_LEGACY,
-} from "./client";
+import { fetchNewEmails } from "./client";
 import { fetchEmailsByDateRange } from "./date-range";
 import { parseDailyEmail, type DailyTransaction } from "./parse-daily";
 import { markDateCovered } from "./coverage";
@@ -179,57 +173,6 @@ export async function runDateRangeIngest(
   for (const email of emails) {
     const ids = await processEmail(email, cardId, result);
     newlyInsertedIds.push(...ids);
-  }
-
-  if (newlyInsertedIds.length > 0) {
-    await classifyNewTransactions(newlyInsertedIds);
-  }
-
-  return result;
-}
-
-/**
- * 向后兼容：使用全局 IMAP 配置执行增量拉取（无 cardId）。
- * 保留用于旧的 /api/ingest/daily 端点。新交易不绑定 cardId。
- */
-export async function runDailyIngestLegacy(): Promise<IngestResult> {
-  const config = getImapConfig();
-  const cursor = await getCursor();
-  const emails = await fetchNewEmails(config, cursor, SUBJECT_LEGACY);
-
-  const result: IngestResult = {
-    fetched: emails.length,
-    inserted: 0,
-    skipped: 0,
-  };
-  if (emails.length === 0) return result;
-
-  const newlyInsertedIds: string[] = [];
-
-  for (const email of emails) {
-    const insertedIds: string[] = [];
-    const { transactions, coveredDates } = parseDailyEmail({
-      text: email.text,
-      html: email.html,
-    });
-
-    for (const tx of transactions) {
-      const outcome = await upsertDailyTransaction(tx, null);
-      if (outcome.inserted) {
-        result.inserted += 1;
-        insertedIds.push(outcome.id);
-      } else {
-        result.skipped += 1;
-      }
-    }
-
-    // 全局覆盖度键（cardId = null）
-    for (const date of coveredDates) {
-      await markDateCovered(date, null);
-    }
-
-    newlyInsertedIds.push(...insertedIds);
-    await setCursor(email.uid);
   }
 
   if (newlyInsertedIds.length > 0) {

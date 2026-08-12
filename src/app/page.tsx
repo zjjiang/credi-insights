@@ -34,7 +34,7 @@ export default function HomePage() {
           fetch("/api/cards").then((r) => r.json()),
           fetch("/api/cards/stats").then((r) => r.json()),
         ]);
-        if (cardsRes.success) setCards(cardsRes.data);
+        if (cardsRes.success) setCards(cardsRes.data.cards || []);
         if (statsRes.success) {
           const statsMap: Record<string, CardStats> = {};
           for (const s of statsRes.data) {
@@ -101,7 +101,7 @@ export default function HomePage() {
                     {card.alias || `${card.bank} ${card.cardLast4}`}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {card.bank} •{" "}尾号 {card.cardLast4}
+                    {card.bank} • 尾号 {card.cardLast4}
                   </p>
                 </div>
                 {card.billingDay && (
