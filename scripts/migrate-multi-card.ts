@@ -10,7 +10,6 @@
  */
 
 import { prisma } from "../src/lib/db";
-import { COVERAGE_KEY_PREFIX, getCoverageKey } from "../src/lib/imap/coverage";
 
 async function main() {
   console.log("开始多卡架构数据迁移...\n");

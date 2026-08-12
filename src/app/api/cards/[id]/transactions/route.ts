@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import {
-  getCoveredDates,
-  computeWindowCoverage,
-  normalizeCoverageDate,
-} from "@/lib/imap/coverage";
 import { groupTransactionsByDay } from "@/lib/daily/group-by-day";
 
 export const dynamic = "force-dynamic";
@@ -19,13 +14,12 @@ interface Params {
 /**
  * GET /api/cards/[id]/transactions?days=45&before=YYYY-MM-DD
  *
- * 按自然日分组、日期倒序返回该卡的交易（含每日总额与覆盖状态）。
+ * 按自然日分组、日期倒序返回该卡的交易。只返回有交易的日期。
  */
 export async function GET(request: Request, { params }: Params) {
   try {
     const { id: cardId } = await params;
 
-    // 验证卡片存在
     const card = await prisma.card.findUnique({
       where: { id: cardId },
       select: { id: true },
@@ -50,43 +44,32 @@ export async function GET(request: Request, { params }: Params) {
       beforeParam && /^\d{4}-\d{2}-\d{2}$/.test(beforeParam)
         ? new Date(`${beforeParam}T00:00:00`)
         : new Date();
-    const endDate = normalizeCoverageDate(end);
+    const endDate = end.toISOString().split("T")[0];
 
     const start = new Date(`${endDate}T00:00:00`);
     start.setDate(start.getDate() - (days - 1));
-    const startDate = normalizeCoverageDate(start);
+    const startDate = start.toISOString().split("T")[0];
 
-    // 窗口内交易（闭区间 [start, end]）
     const endExclusive = new Date(`${endDate}T00:00:00`);
     endExclusive.setDate(endExclusive.getDate() + 1);
     const transactions = await prisma.transaction.findMany({
-      where: {
-        cardId,
-        txDate: { gte: start, lt: endExclusive },
-      },
+      where: { cardId, txDate: { gte: start, lt: endExclusive } },
       include: { category: true },
       orderBy: [{ txDate: "desc" }, { txTime: "desc" }],
     });
 
-    // 卡级覆盖状态
-    const covered = await getCoveredDates(cardId);
-    const coverage = computeWindowCoverage(covered, startDate, endDate);
-
-    // 按日分组
-    const dayEntries = groupTransactionsByDay(
-      transactions,
-      covered,
-      startDate,
-      endDate,
-    );
-    const hasGap = coverage.some((d) => !d.covered);
+    const grouped = groupTransactionsByDay(transactions);
 
     return NextResponse.json({
       success: true,
       data: {
         window: { start: startDate, end: endDate, days },
-        hasGap,
-        days: dayEntries,
+        days: grouped.map((day) => ({
+          date: day.date,
+          debit: day.debit,
+          credit: day.credit,
+          transactions: day.transactions.map(serializeTx),
+        })),
       },
     });
   } catch (error) {
@@ -96,4 +79,41 @@ export async function GET(request: Request, { params }: Params) {
       { status: 500 },
     );
   }
+}
+
+type TxWithCategory = Awaited<
+  ReturnType<typeof prisma.transaction.findMany>
+>[number] & { category: unknown };
+
+function serializeTx(tx: TxWithCategory) {
+  const t = tx as Record<string, unknown> & {
+    category: {
+      id: string;
+      name: string;
+      icon: string | null;
+      color: string | null;
+    } | null;
+  };
+  return {
+    id: t.id,
+    txDate: (t.txDate as Date).toISOString(),
+    txTime: t.txTime ?? null,
+    merchant: t.merchant,
+    amount: Number(t.amount),
+    currency: t.currency,
+    type: t.type,
+    cardLast4: t.cardLast4 ?? null,
+    txStatus: t.txStatus ?? null,
+    source: t.source,
+    graduatedFromDaily: t.graduatedFromDaily ?? false,
+    categoryId: t.categoryId ?? null,
+    category: t.category
+      ? {
+          id: t.category.id,
+          name: t.category.name,
+          icon: t.category.icon,
+          color: t.category.color,
+        }
+      : null,
+  };
 }

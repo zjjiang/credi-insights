@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { ApiCategory } from "@/lib/api-types";
 
 interface DayTx {
@@ -19,7 +18,6 @@ interface DayTx {
 
 interface DayEntry {
   date: string;
-  covered: boolean;
   debit: number;
   credit: number;
   transactions: DayTx[];
@@ -44,58 +42,24 @@ function fmt(n: number): string {
 export function DayCard({
   day,
   categories,
-  refetching,
-  onRefetch,
   onChanged,
 }: {
   day: DayEntry;
   categories: ApiCategory[];
-  refetching: boolean;
-  onRefetch: () => void;
   onChanged: () => void;
 }) {
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{day.date}</span>
-          {day.covered ? (
-            <Badge variant="secondary" className="text-xs">
-              已关账
-            </Badge>
-          ) : (
-            <Badge
-              variant="outline"
-              className="border-amber-300 text-xs text-amber-600"
-            >
-              缺口
-            </Badge>
+        <span className="text-sm font-medium">{day.date}</span>
+        <span className="text-sm tabular-nums">
+          {day.debit > 0 && (
+            <span className="text-foreground">-{fmt(day.debit)}</span>
           )}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm tabular-nums">
-            {day.debit > 0 && (
-              <span className="text-foreground">-{fmt(day.debit)}</span>
-            )}
-            {day.credit > 0 && (
-              <span className="ml-2 text-emerald-600">+{fmt(day.credit)}</span>
-            )}
-          </span>
-          {!day.covered && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={refetching}
-              onClick={onRefetch}
-            >
-              <RefreshCw
-                className={`mr-1 h-3 w-3 ${refetching ? "animate-spin" : ""}`}
-              />
-              补拉
-            </Button>
+          {day.credit > 0 && (
+            <span className="ml-2 text-emerald-600">+{fmt(day.credit)}</span>
           )}
-        </div>
+        </span>
       </div>
       <ul className="divide-y">
         {day.transactions.map((tx) => (

@@ -5,7 +5,6 @@ import { makeFingerprint } from "@/lib/fingerprint";
 import { fetchNewEmails } from "./client";
 import { fetchEmailsByDateRange } from "./date-range";
 import { parseDailyEmail, type DailyTransaction } from "./parse-daily";
-import { markDateCovered } from "./coverage";
 import type { ImapConfig } from "./client";
 
 export interface IngestResult {
@@ -80,7 +79,7 @@ async function setCardCursor(cardId: string, uid: number): Promise<void> {
 }
 
 /**
- * 处理一封邮件：解析 → 指纹去重入库 → 记录覆盖度。
+ * 处理一封邮件：解析 → 指纹去重入库。
  * 返回本封邮件新入库交易的 id（供后续 AI 分类）。
  */
 async function processEmail(
@@ -89,7 +88,7 @@ async function processEmail(
   result: IngestResult,
 ): Promise<string[]> {
   const insertedIds: string[] = [];
-  const { transactions, coveredDates } = parseDailyEmail({
+  const { transactions } = parseDailyEmail({
     text: email.text,
     html: email.html,
   });
@@ -102,11 +101,6 @@ async function processEmail(
     } else {
       result.skipped += 1;
     }
-  }
-
-  // 记录该卡的覆盖日期
-  for (const date of coveredDates) {
-    await markDateCovered(date, cardId);
   }
 
   return insertedIds;
