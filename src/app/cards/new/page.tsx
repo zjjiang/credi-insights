@@ -21,12 +21,18 @@ export default function NewCardPage() {
     const data = {
       bank: formData.get("bank") as string,
       cardLast4: formData.get("cardLast4") as string,
-      alias: formData.get("alias") as string || null,
-      billingDay: formData.get("billingDay") ? Number(formData.get("billingDay")) : null,
-      imapHost: formData.get("imapHost") as string || null,
-      imapPort: formData.get("imapPort") ? Number(formData.get("imapPort")) : null,
-      imapUser: formData.get("imapUser") as string || null,
-      imapPassword: formData.get("imapPassword") as string || null,
+      alias: (formData.get("alias") as string) || null,
+      billingDay: formData.get("billingDay")
+        ? Number(formData.get("billingDay"))
+        : null,
+      dueDay: formData.get("dueDay") ? Number(formData.get("dueDay")) : null,
+      imapHost: (formData.get("imapHost") as string) || null,
+      imapPort: formData.get("imapPort")
+        ? Number(formData.get("imapPort"))
+        : null,
+      imapUser: (formData.get("imapUser") as string) || null,
+      imapPassword: (formData.get("imapPassword") as string) || null,
+      imapSubject: (formData.get("imapSubject") as string) || null,
     };
 
     try {
@@ -64,12 +70,7 @@ export default function NewCardPage() {
 
           <div>
             <Label htmlFor="bank">发卡行 *</Label>
-            <Input
-              id="bank"
-              name="bank"
-              placeholder="如：招商银行"
-              required
-            />
+            <Input id="bank" name="bank" placeholder="如：招商银行" required />
           </div>
 
           <div>
@@ -86,22 +87,32 @@ export default function NewCardPage() {
 
           <div>
             <Label htmlFor="alias">卡片别名（可选）</Label>
-            <Input
-              id="alias"
-              name="alias"
-              placeholder="如：主卡、备用卡"
-            />
+            <Input id="alias" name="alias" placeholder="如：主卡、备用卡" />
           </div>
 
           <div>
-            <Label htmlFor="billingDay">账单日（可选）</Label>
+            <Label htmlFor="billingDay">账单日 *（1-31）</Label>
             <Input
               id="billingDay"
               name="billingDay"
               type="number"
               min="1"
               max="31"
-              placeholder="如：28"
+              placeholder="如：18"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="dueDay">还款日 *（1-31）</Label>
+            <Input
+              id="dueDay"
+              name="dueDay"
+              type="number"
+              min="1"
+              max="31"
+              placeholder="如：8"
+              required
             />
           </div>
         </div>
@@ -113,41 +124,57 @@ export default function NewCardPage() {
           </p>
 
           <div>
-            <Label htmlFor="imapHost">IMAP 服务器</Label>
+            <Label htmlFor="imapHost">IMAP 服务器 *</Label>
             <Input
               id="imapHost"
               name="imapHost"
               placeholder="如：imap.qq.com"
+              required
             />
           </div>
 
           <div>
-            <Label htmlFor="imapPort">IMAP 端口</Label>
+            <Label htmlFor="imapPort">IMAP 端口 *</Label>
             <Input
               id="imapPort"
               name="imapPort"
               type="number"
-              placeholder="如：993"
+              placeholder="993"
+              defaultValue="993"
+              required
             />
           </div>
 
           <div>
-            <Label htmlFor="imapUser">邮箱账号</Label>
+            <Label htmlFor="imapUser">邮箱账号 *</Label>
             <Input
               id="imapUser"
               name="imapUser"
               type="email"
               placeholder="your@email.com"
+              required
             />
           </div>
 
           <div>
-            <Label htmlFor="imapPassword">IMAP 密码/授权码</Label>
+            <Label htmlFor="imapPassword">IMAP 密码/授权码 *</Label>
             <Input
               id="imapPassword"
               name="imapPassword"
               type="password"
               placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="imapSubject">邮件主题过滤 *</Label>
+            <Input
+              id="imapSubject"
+              name="imapSubject"
+              placeholder="每日信用管家"
+              defaultValue="每日信用管家"
+              required
             />
           </div>
         </div>

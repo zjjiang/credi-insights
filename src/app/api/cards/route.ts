@@ -24,27 +24,24 @@ export async function POST(request: Request) {
     } = body;
 
     // 校验必填字段
-    if (!bank || !cardLast4 || !billingDay || !dueDay) {
+    if (
+      !bank ||
+      !cardLast4 ||
+      !billingDay ||
+      !dueDay ||
+      !imapHost ||
+      !imapUser ||
+      !imapPassword ||
+      !imapSubject
+    ) {
       return NextResponse.json(
         { success: false, error: "缺少必填字段" },
         { status: 400 },
       );
     }
 
-    if (!imapHost || !imapUser || !imapPassword || !imapSubject) {
-      return NextResponse.json(
-        { success: false, error: "IMAP 配置不完整" },
-        { status: 400 },
-      );
-    }
-
     // 校验账单日/还款日范围
-    if (
-      billingDay < 1 ||
-      billingDay > 31 ||
-      dueDay < 1 ||
-      dueDay > 31
-    ) {
+    if (billingDay < 1 || billingDay > 31 || dueDay < 1 || dueDay > 31) {
       return NextResponse.json(
         { success: false, error: "账单日/还款日必须在 1-31 之间" },
         { status: 400 },
@@ -113,7 +110,14 @@ export async function GET() {
     // 计算本月累计和最近同步时间
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const monthEnd = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+    );
 
     const cardsWithStats = await Promise.all(
       cards.map(async (card) => {
@@ -143,7 +147,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      data: { cards: cardsWithStats },
+      data: cardsWithStats,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "查询卡片失败";
