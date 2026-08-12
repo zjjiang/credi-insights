@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { runDailyIngestLegacy } from "@/lib/imap/ingest";
+import { runDailyIngest } from "@/lib/imap/ingest";
 import { isIngestAuthorized } from "@/lib/imap/ingest-auth";
 
-// 抓取可能耗时（IMAP 往返 + AI 分类），禁用静态化并放宽超时
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+interface Params {
+  params: Promise<{ cardId: string }>;
+}
+
 /**
- * POST /api/ingest/daily
- * 触发一次日推送抓取（向后兼容：使用全局 IMAP 配置）。
- * 若配置了 INGEST_SECRET，需在 header `x-ingest-secret` 或 query `?secret=` 中携带匹配值。
- *
- * 新架构请使用 POST /api/ingest/cards/{cardId}。
+ * POST /api/ingest/cards/[cardId]
+ * 触发该卡的增量日推抓取（使用卡级 IMAP 配置和 UID 游标）。
  */
-export async function POST(request: Request) {
+export async function POST(request: Request, { params }: Params) {
   try {
     if (!isIngestAuthorized(request)) {
       return NextResponse.json(
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await runDailyIngestLegacy();
+    const { cardId } = await params;
+    const result = await runDailyIngest(cardId);
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ingest failed";

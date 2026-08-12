@@ -47,6 +47,39 @@ export async function POST(request: Request) {
       throw err;
     }
 
+    // 解析卡号后查询 Card 表，若不存在返回 400
+    const cardLast4 = result.cardLast4;
+    if (!cardLast4) {
+      await prisma.upload.update({
+        where: { id: upload.id },
+        data: { status: "FAILED" },
+      });
+      return NextResponse.json(
+        { success: false, error: "账单中未找到卡号" },
+        { status: 400 },
+      );
+    }
+
+    // 查询该卡是否已注册（匹配 bank + cardLast4，暂定 bank = "招商银行"）
+    const card = await prisma.card.findFirst({
+      where: { cardLast4, isActive: true },
+      select: { id: true },
+    });
+
+    if (!card) {
+      await prisma.upload.update({
+        where: { id: upload.id },
+        data: { status: "FAILED" },
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `卡号 ${cardLast4} 未注册，请先在卡片管理中添加`,
+        },
+        { status: 400 },
+      );
+    }
+
     // 指纹去重合并：月账单为准。命中已有记录（多为日推送）时覆盖元数据，
     // 但保留用户已打的 categoryId；无匹配则新增。只对新增交易做 AI 分类。
     const newlyInsertedIds: string[] = [];
@@ -64,12 +97,13 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        // 覆盖元数据，source 归为月账单，绑定到本次 upload；不动 categoryId。
+        // 覆盖元数据，source 归为月账单，绑定到本次 upload 和 card；不动 categoryId。
         // 若原记录来自日推，标记 graduatedFromDaily 供月账单 Tab 高亮。
         await prisma.transaction.update({
           where: { id: existing.id },
           data: {
             uploadId: upload.id,
+            cardId: card.id,
             txDate: new Date(t.txDate),
             merchant: t.merchant,
             amount: t.amount,
@@ -85,6 +119,7 @@ export async function POST(request: Request) {
         const created = await prisma.transaction.create({
           data: {
             uploadId: upload.id,
+            cardId: card.id,
             txDate: new Date(t.txDate),
             merchant: t.merchant,
             amount: t.amount,
@@ -104,6 +139,7 @@ export async function POST(request: Request) {
     await prisma.upload.update({
       where: { id: upload.id },
       data: {
+        cardId: card.id,
         status: "DONE",
         imageMonth: result.imageMonth,
         billingStart: result.billingStart

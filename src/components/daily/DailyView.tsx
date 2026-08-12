@@ -30,17 +30,26 @@ interface ByDayResponse {
   days: DayEntry[];
 }
 
-export function DailyView({ categories }: { categories: ApiCategory[] }) {
+export function DailyView({
+  categories,
+  cardId,
+}: {
+  categories: ApiCategory[];
+  cardId?: string;
+}) {
   const [data, setData] = useState<ByDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refetching, setRefetching] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetch("/api/transactions/by-day").then((x) => x.json());
+    const url = cardId
+      ? `/api/cards/${cardId}/transactions`
+      : "/api/transactions/by-day";
+    const r = await fetch(url).then((x) => x.json());
     if (r.success) setData(r.data);
     setLoading(false);
-  }, []);
+  }, [cardId]);
 
   useEffect(() => {
     load();
@@ -49,10 +58,11 @@ export function DailyView({ categories }: { categories: ApiCategory[] }) {
   async function refetchDay(date: string) {
     setRefetching(date);
     try {
+      const body = cardId ? { start: date, cardId } : { start: date };
       await fetch("/api/ingest/refetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ start: date }),
+        body: JSON.stringify(body),
       });
       await load();
     } finally {

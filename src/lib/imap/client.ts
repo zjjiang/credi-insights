@@ -6,7 +6,8 @@ const CURSOR_KEY = "imap_last_uid";
 // 招行邮件经 live.cn 转发到 QQ 后，发件人变为转发者，不能再按 FROM 过滤。
 // 主题里的「每日信用管家」在转发后仍保留（IMAP subject 为「包含」匹配，
 // 即使带 "Fwd:"/"转发：" 前缀也能命中），故只按主题过滤。
-const SUBJECT = "每日信用管家";
+// 多卡架构下每张卡独立配置 subject，由调用方传入。
+export const SUBJECT_LEGACY = "每日信用管家"; // 仅供 legacy 函数使用
 
 export interface ImapConfig {
   host: string;
@@ -76,6 +77,7 @@ export async function setCursor(uid: number): Promise<void> {
 export async function fetchNewEmails(
   config: ImapConfig,
   sinceUid: number,
+  subject: string,
 ): Promise<FetchedEmail[]> {
   const client = new ImapFlow({
     host: config.host,
@@ -98,10 +100,7 @@ export async function fetchNewEmails(
   try {
     // UID 搜索范围：sinceUid+1 到末尾。sinceUid=0 时搜全部。
     const uidRange = `${sinceUid + 1}:*`;
-    const uids = await client.search(
-      { uid: uidRange, subject: SUBJECT },
-      { uid: true },
-    );
+    const uids = await client.search({ uid: uidRange, subject }, { uid: true });
 
     if (!uids || uids.length === 0) return [];
 

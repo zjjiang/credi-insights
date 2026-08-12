@@ -2,7 +2,6 @@ import { ImapFlow, type SearchObject } from "imapflow";
 import { simpleParser } from "mailparser";
 import type { ImapConfig, FetchedEmail } from "./client";
 
-const SUBJECT = "每日信用管家";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -11,7 +10,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * IMAP 的 `before` 是排它的（不含当天），故闭区间 [start, end] 的 before
  * 取 end 的次日零点。start/end 均为 YYYY-MM-DD。
  */
-export function buildDateRangeSearch(start: string, end: string): SearchObject {
+export function buildDateRangeSearch(
+  start: string,
+  end: string,
+  subject: string,
+): SearchObject {
   if (!DATE_RE.test(start) || !DATE_RE.test(end)) {
     throw new Error(`日期格式无效，应为 YYYY-MM-DD: start=${start} end=${end}`);
   }
@@ -22,7 +25,7 @@ export function buildDateRangeSearch(start: string, end: string): SearchObject {
   }
   const before = new Date(endDate);
   before.setDate(before.getDate() + 1);
-  return { subject: SUBJECT, since, before };
+  return { subject, since, before };
 }
 
 /**
@@ -33,8 +36,9 @@ export async function fetchEmailsByDateRange(
   config: ImapConfig,
   start: string,
   end: string,
+  subject: string,
 ): Promise<FetchedEmail[]> {
-  const search = buildDateRangeSearch(start, end);
+  const search = buildDateRangeSearch(start, end, subject);
 
   const client = new ImapFlow({
     host: config.host,

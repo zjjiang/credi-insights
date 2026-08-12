@@ -11,6 +11,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Card {
+  id           String        @id @default(cuid())
+  bank         String        // "CMB" | "SPDB" | ...
+  cardLast4    String        // "0094"
+  alias        String?       // 用户自定义别名
+  billingDay   Int           // 账单日 1-31
+  dueDay       Int           // 还款日 1-31
+  imapHost     String        // "imap.qq.com"
+  imapPort     Int           @default(993)
+  imapUser     String        // "user@qq.com"
+  imapPassword String        // 明文存储
+  imapSubject  String        // "每日信用管家"
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+  uploads      Upload[]
+
+  @@unique([bank, cardLast4])
+}
+
 model Upload {
   id           String        @id @default(cuid())
   originalName String
@@ -20,6 +41,8 @@ model Upload {
   billingEnd   DateTime?     // 账期结束 2026-04-15
   dueDate      DateTime?     // 还款日   2026-05-03
   cardLast4    String?       // "0094"
+  cardId       String?
+  card         Card?         @relation(fields: [cardId], references: [id], onDelete: SetNull)
   status       UploadStatus  @default(PENDING)
   parsedRawText String?  @db.Text
   txCount      Int           @default(0)
@@ -38,6 +61,8 @@ model Transaction {
   id          String    @id @default(cuid())
   uploadId    String?
   upload      Upload?   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  cardId      String?
+  card        Card?     @relation(fields: [cardId], references: [id], onDelete: SetNull)
   txDate      DateTime
   txTime      String?   // 精确交易时间 "HH:mm:ss"（日推送提供，月账单无）
   merchant    String
