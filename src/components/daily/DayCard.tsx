@@ -122,13 +122,13 @@ function TxRow({
       {stale && (
         <Badge
           variant="outline"
-          className="border-red-300 text-[10px] text-red-500"
+          className="shrink-0 border-red-300 text-[10px] text-red-500"
         >
           陈旧未对账
         </Badge>
       )}
       <select
-        className="rounded border bg-background px-1 py-0.5 text-xs"
+        className="w-20 shrink-0 rounded border bg-background px-1 py-0.5 text-xs text-muted-foreground"
         value={tx.categoryId ?? ""}
         disabled={busy}
         onChange={(e) => patchCategory(e.target.value)}
@@ -141,12 +141,16 @@ function TxRow({
           </option>
         ))}
       </select>
-      <span className="tabular-nums">
+      <span
+        className={`shrink-0 tabular-nums font-medium ${
+          tx.type === "CREDIT" ? "text-emerald-600" : "text-foreground"
+        }`}
+      >
         {tx.type === "CREDIT" ? "+" : "-"}
         {fmt(tx.amount)}
       </span>
       <button
-        className="text-muted-foreground hover:text-red-500"
+        className="shrink-0 text-muted-foreground hover:text-red-500"
         disabled={busy}
         onClick={remove}
         aria-label="删除"
