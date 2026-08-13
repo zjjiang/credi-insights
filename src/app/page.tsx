@@ -1,97 +1,139 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { MsgDropzone } from "@/components/upload/MsgDropzone";
-import { UploadBatchCard } from "@/components/history/UploadBatchCard";
-import { DailyView } from "@/components/daily/DailyView";
-import type { ApiUpload, ApiCategory } from "@/lib/api-types";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Plus, CreditCard } from "lucide-react";
 
-type Tab = "daily" | "bills";
-
-export default function HomePage() {
-  const [tab, setTab] = useState<Tab>("daily");
-  const [uploads, setUploads] = useState<ApiUpload[]>([]);
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadData = useCallback(async () => {
-    const [u, c] = await Promise.all([
-      fetch("/api/uploads").then((r) => r.json()),
-      fetch("/api/categories").then((r) => r.json()),
-    ]);
-    if (u.success) setUploads(u.data);
-    if (c.success) setCategories(c.data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 挂载时拉取数据
-    void loadData();
-  }, [loadData]);
-
-  return (
-    <div className="flex flex-col p-4 gap-4">
-      <div className="flex gap-1 rounded-lg bg-muted p-1">
-        <TabButton active={tab === "daily"} onClick={() => setTab("daily")}>
-          按日
-        </TabButton>
-        <TabButton active={tab === "bills"} onClick={() => setTab("bills")}>
-          月账单
-        </TabButton>
-      </div>
-
-      {tab === "daily" ? (
-        <DailyView categories={categories} />
-      ) : (
-        <>
-          <MsgDropzone onUpload={() => loadData()} />
-          {loading ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              加载中...
-            </p>
-          ) : uploads.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              还没有账单，上传第一份吧
-            </p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {uploads.map((u) => (
-                <UploadBatchCard
-                  key={u.id}
-                  batch={u}
-                  categories={categories}
-                  onDeleted={(id) =>
-                    setUploads((prev) => prev.filter((x) => x.id !== id))
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+interface Card {
+  id: string;
+  bank: string;
+  cardLast4: string;
+  alias: string | null;
+  billingDay: number | null;
+  isActive: boolean;
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+interface CardStats {
+  cardId: string;
+  monthDebit: number;
+  monthCredit: number;
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const [cards, setCards] = useState<Card[]>([]);
+  const [stats, setStats] = useState<Record<string, CardStats>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const [cardsRes, statsRes] = await Promise.all([
+          fetch("/api/cards").then((r) => r.json()),
+          fetch("/api/cards/stats").then((r) => r.json()),
+        ]);
+        if (cardsRes.success) setCards(cardsRes.data.cards || []);
+        if (statsRes.success) {
+          const statsMap: Record<string, CardStats> = {};
+          for (const s of statsRes.data) {
+            statsMap[s.cardId] = s;
+          }
+          setStats(statsMap);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    void load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto max-w-5xl p-4">
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          加载中...
+        </p>
+      </div>
+    );
+  }
+
+  if (cards.length === 0) {
+    return (
+      <div className="container mx-auto max-w-5xl p-4">
+        <div className="flex flex-col items-center justify-center py-16">
+          <CreditCard className="mb-4 h-12 w-12 text-muted-foreground" />
+          <p className="mb-6 text-center text-sm text-muted-foreground">
+            暂无卡片，点击下方按钮添加您的第一张信用卡
+          </p>
+          <Button onClick={() => router.push("/cards/new")}>
+            <Plus className="h-4 w-4" />
+            <span className="ml-2">新增卡片</span>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <button
-      onClick={onClick}
-      className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-        active
-          ? "bg-background text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
+    <div className="container mx-auto max-w-5xl p-4">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">我的信用卡</h1>
+        <Button onClick={() => router.push("/cards/new")} size="sm">
+          <Plus className="h-4 w-4" />
+          <span className="ml-2">新增卡片</span>
+        </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {cards.map((card) => {
+          const stat = stats[card.id];
+          return (
+            <button
+              key={card.id}
+              onClick={() => router.push(`/cards/${card.id}`)}
+              className="rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent"
+            >
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <h3 className="font-medium">
+                    {card.alias || `${card.bank} ${card.cardLast4}`}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {card.bank} • 尾号 {card.cardLast4}
+                  </p>
+                </div>
+                {card.billingDay && (
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">账单日</p>
+                    <p className="text-sm font-medium">{card.billingDay} 号</p>
+                  </div>
+                )}
+              </div>
+
+              {stat && (
+                <div className="flex gap-4 border-t pt-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">本月支出</p>
+                    <p className="text-lg font-semibold text-red-600">
+                      ¥{stat.monthDebit.toFixed(2)}
+                    </p>
+                  </div>
+                  {stat.monthCredit > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">本月收入</p>
+                      <p className="text-lg font-semibold text-green-600">
+                        ¥{stat.monthCredit.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

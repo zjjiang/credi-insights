@@ -1,12 +1,10 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
-import { prisma } from "@/lib/db";
 
-const CURSOR_KEY = "imap_last_uid";
 // 招行邮件经 live.cn 转发到 QQ 后，发件人变为转发者，不能再按 FROM 过滤。
 // 主题里的「每日信用管家」在转发后仍保留（IMAP subject 为「包含」匹配，
 // 即使带 "Fwd:"/"转发：" 前缀也能命中），故只按主题过滤。
-const SUBJECT = "每日信用管家";
+// 多卡架构下每张卡独立配置 subject，由调用方传入。
 
 export interface ImapConfig {
   host: string;
@@ -24,58 +22,13 @@ export interface FetchedEmail {
 }
 
 /**
- * 从环境变量读取 IMAP 配置，缺失必填项时抛错（快速失败）。
- */
-export function getImapConfig(): ImapConfig {
-  const host = process.env.IMAP_HOST;
-  const user = process.env.IMAP_USER;
-  const pass = process.env.IMAP_PASS;
-  const port = Number(process.env.IMAP_PORT ?? "993");
-
-  const missing = [
-    !host && "IMAP_HOST",
-    !user && "IMAP_USER",
-    !pass && "IMAP_PASS",
-  ].filter(Boolean);
-
-  if (missing.length > 0) {
-    throw new Error(`IMAP 配置缺失: ${missing.join(", ")}（请在 .env 中设置）`);
-  }
-  if (!Number.isFinite(port) || port <= 0) {
-    throw new Error(`IMAP_PORT 无效: ${process.env.IMAP_PORT}`);
-  }
-
-  return { host: host!, port, user: user!, pass: pass! };
-}
-
-/**
- * 读取游标：上次已处理的最大邮件 UID。无记录返回 0。
- */
-export async function getCursor(): Promise<number> {
-  const s = await prisma.setting.findUnique({ where: { key: CURSOR_KEY } });
-  if (!s) return 0;
-  const n = Number(s.value);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-/**
- * 更新游标为给定 UID。只应在成功处理后调用。
- */
-export async function setCursor(uid: number): Promise<void> {
-  await prisma.setting.upsert({
-    where: { key: CURSOR_KEY },
-    create: { key: CURSOR_KEY, value: String(uid) },
-    update: { value: String(uid) },
-  });
-}
-
-/**
  * 连接 IMAP，拉取发件人为招行、标题含「每日信用管家」、UID 大于 sinceUid 的新邮件。
  * 返回按 UID 升序排列的邮件（含解析后的 text/html）。
  */
 export async function fetchNewEmails(
   config: ImapConfig,
   sinceUid: number,
+  subject: string,
 ): Promise<FetchedEmail[]> {
   const client = new ImapFlow({
     host: config.host,
@@ -98,10 +51,7 @@ export async function fetchNewEmails(
   try {
     // UID 搜索范围：sinceUid+1 到末尾。sinceUid=0 时搜全部。
     const uidRange = `${sinceUid + 1}:*`;
-    const uids = await client.search(
-      { uid: uidRange, subject: SUBJECT },
-      { uid: true },
-    );
+    const uids = await client.search({ uid: uidRange, subject }, { uid: true });
 
     if (!uids || uids.length === 0) return [];
 

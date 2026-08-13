@@ -26,22 +26,7 @@ export interface DailyTransaction {
 
 export interface DailyParseResult {
   transactions: DailyTransaction[];
-  coveredDates: string[]; // 邮件日期头对应的自然日（YYYY-MM-DD），去重升序
   rawText: string;
-}
-
-/**
- * 提取邮件中所有日期头对应的自然日（去重、升序）。
- * 基于「YYYY/MM/DD 您的消费明细如下」头部，与是否有交易明细无关 ——
- * 当日无消费的邮件仍应记为「已覆盖」。
- */
-export function extractCoveredDates(lines: string[]): string[] {
-  const set = new Set<string>();
-  for (const line of lines) {
-    const m = line.match(DATE_HEADER_RE);
-    if (m) set.add(`${m[1]}-${m[2]}-${m[3]}`);
-  }
-  return [...set].sort();
 }
 
 const DATE_HEADER_RE = /(\d{4})\/(\d{2})\/(\d{2})\s*您的消费明细如下/;
@@ -201,7 +186,6 @@ export function parseDailyEmail(input: {
 
   return {
     transactions: parseLines(lines),
-    coveredDates: extractCoveredDates(lines),
     rawText: lines.join("\n"),
   };
 }

@@ -7,15 +7,31 @@ export const dynamic = "force-dynamic";
 const DEFAULT_WINDOW_DAYS = 45;
 const MAX_WINDOW_DAYS = 366;
 
+interface Params {
+  params: Promise<{ id: string }>;
+}
+
 /**
- * GET /api/transactions/by-day?days=45&before=YYYY-MM-DD
+ * GET /api/cards/[id]/transactions?days=45&before=YYYY-MM-DD
  *
- * 按自然日分组、日期倒序返回交易（含每日总额）。只返回有交易的日期。
- * - days: 窗口天数（默认 45，上限 366）
- * - before: 窗口结束日（含），默认今天。向前翻页时传上一页最早日期的前一天。
+ * 按自然日分组、日期倒序返回该卡的交易。只返回有交易的日期。
  */
-export async function GET(request: Request) {
+export async function GET(request: Request, { params }: Params) {
   try {
+    const { id: cardId } = await params;
+
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+      select: { id: true },
+    });
+
+    if (!card) {
+      return NextResponse.json(
+        { success: false, error: "卡片不存在" },
+        { status: 404 },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const daysParam = Number(searchParams.get("days") ?? DEFAULT_WINDOW_DAYS);
     const days =
@@ -34,30 +50,26 @@ export async function GET(request: Request) {
     start.setDate(start.getDate() - (days - 1));
     const startDate = start.toISOString().split("T")[0];
 
-    // 窗口内交易（闭区间 [start, end]）
     const endExclusive = new Date(`${endDate}T00:00:00`);
     endExclusive.setDate(endExclusive.getDate() + 1);
     const transactions = await prisma.transaction.findMany({
-      where: { txDate: { gte: start, lt: endExclusive } },
+      where: { cardId, txDate: { gte: start, lt: endExclusive } },
       include: { category: true },
       orderBy: [{ txDate: "desc" }, { txTime: "desc" }],
     });
 
-    // 按发生日分组，倒序，只返回有交易的日期
     const grouped = groupTransactionsByDay(transactions);
-
-    const dayEntries = grouped.map((day) => ({
-      date: day.date,
-      debit: day.debit,
-      credit: day.credit,
-      transactions: day.transactions.map(serializeTx),
-    }));
 
     return NextResponse.json({
       success: true,
       data: {
         window: { start: startDate, end: endDate, days },
-        days: dayEntries,
+        days: grouped.map((day) => ({
+          date: day.date,
+          debit: day.debit,
+          credit: day.credit,
+          transactions: day.transactions.map(serializeTx),
+        })),
       },
     });
   } catch (error) {

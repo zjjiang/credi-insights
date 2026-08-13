@@ -19,6 +19,7 @@
     "@fontsource/noto-sans-sc": "^5.2.9",
     "@paralleldrive/cuid2": "^3.3.0",
     "@prisma/client": "^6.19.3",
+    "@radix-ui/react-label": "^2.1.15",
     "@react-pdf/renderer": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
