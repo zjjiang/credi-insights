@@ -110,11 +110,11 @@ describe("GET /api/cards", () => {
     vi.mocked(prisma.card.findMany).mockResolvedValue(mockCards);
     // Mock aggregate to return monthly total
     vi.mocked(prisma.transaction.aggregate).mockResolvedValue({
-      _sum: { amount: 1000 },
-      _count: null,
-      _avg: null,
-      _min: null,
-      _max: null,
+      _sum: { amount: null },
+      _count: undefined,
+      _avg: undefined,
+      _min: undefined,
+      _max: undefined,
     });
 
     const res = await GET();

@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
+    const cardIdParam = formData.get("cardId");
 
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json(
@@ -49,35 +50,58 @@ export async function POST(request: Request) {
 
     // 解析卡号后查询 Card 表，若不存在返回 400
     const cardLast4 = result.cardLast4;
-    if (!cardLast4) {
-      await prisma.upload.update({
-        where: { id: upload.id },
-        data: { status: "FAILED" },
-      });
-      return NextResponse.json(
-        { success: false, error: "账单中未找到卡号" },
-        { status: 400 },
-      );
-    }
 
-    // 查询该卡是否已注册（匹配 bank + cardLast4，暂定 bank = "招商银行"）
-    const card = await prisma.card.findFirst({
-      where: { cardLast4, isActive: true },
-      select: { id: true },
-    });
+    let card;
 
-    if (!card) {
-      await prisma.upload.update({
-        where: { id: upload.id },
-        data: { status: "FAILED" },
+    // 如果用户在上传时指定了 cardId（如从卡片详情页上传），直接使用
+    if (cardIdParam) {
+      card = await prisma.card.findFirst({
+        where: { id: String(cardIdParam), isActive: true },
+        select: { id: true },
       });
-      return NextResponse.json(
-        {
-          success: false,
-          error: `卡号 ${cardLast4} 未注册，请先在卡片管理中添加`,
-        },
-        { status: 400 },
-      );
+
+      if (!card) {
+        await prisma.upload.update({
+          where: { id: upload.id },
+          data: { status: "FAILED" },
+        });
+        return NextResponse.json(
+          { success: false, error: "指定的卡片不存在" },
+          { status: 400 },
+        );
+      }
+    } else {
+      // 否则使用原有的自动匹配逻辑
+      if (!cardLast4) {
+        await prisma.upload.update({
+          where: { id: upload.id },
+          data: { status: "FAILED" },
+        });
+        return NextResponse.json(
+          { success: false, error: "账单中未找到卡号" },
+          { status: 400 },
+        );
+      }
+
+      // 查询该卡是否已注册（匹配 bank + cardLast4，暂定 bank = "招商银行"）
+      card = await prisma.card.findFirst({
+        where: { cardLast4, isActive: true },
+        select: { id: true },
+      });
+
+      if (!card) {
+        await prisma.upload.update({
+          where: { id: upload.id },
+          data: { status: "FAILED" },
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: `卡号 ${cardLast4} 未注册，请先在卡片管理中添加`,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // 指纹去重合并：月账单为准。命中已有记录（多为日推送）时覆盖元数据，
