@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
-import { BottomNav } from "@/components/shared/BottomNav";
+import { TopNav } from "@/components/shared/TopNav";
 import { AiProvider } from "@/lib/ai-context";
 import { AiSidebar } from "@/components/ai/AiSidebar";
 import { AiToggleButton } from "@/components/ai/AiToggleButton";
@@ -21,13 +21,17 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="zh-CN" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <AiProvider>
-          <main className="flex-1 pb-20">{children}</main>
-          <BottomNav />
+          <TopNav />
+          <main className="flex-1">{children}</main>
           <AiSidebar />
           <AiToggleButton />
         </AiProvider>
