@@ -27,9 +27,10 @@ export async function POST(request: Request) {
     if (
       !bank ||
       !cardLast4 ||
-      !billingDay ||
-      !dueDay ||
+      billingDay == null ||
+      dueDay == null ||
       !imapHost ||
+      imapPort == null ||
       !imapUser ||
       !imapPassword ||
       !imapSubject
