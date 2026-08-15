@@ -52,8 +52,22 @@ export async function GET(request: Request, { params }: Params) {
 
     const endExclusive = new Date(`${endDate}T00:00:00`);
     endExclusive.setDate(endExclusive.getDate() + 1);
+
+    const sinceParam = searchParams.get("since");
+    // since 只能收紧窗口下限，不能放宽——早于窗口自身起点的 since 被忽略
+    const txDateFilter =
+      sinceParam &&
+      /^\d{4}-\d{2}-\d{2}$/.test(sinceParam) &&
+      sinceParam > startDate
+        ? { gt: new Date(`${sinceParam}T00:00:00`), lt: endExclusive }
+        : { gte: start, lt: endExclusive };
+
+    const where = sinceParam
+      ? { cardId, OR: [{ txDate: txDateFilter }, { uploadId: null }] }
+      : { cardId, txDate: txDateFilter };
+
     const transactions = await prisma.transaction.findMany({
-      where: { cardId, txDate: { gte: start, lt: endExclusive } },
+      where,
       include: { category: true },
       orderBy: [{ txDate: "desc" }, { txTime: "desc" }],
     });
