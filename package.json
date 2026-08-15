@@ -11,12 +11,14 @@
     "db:migrate": "prisma migrate dev",
     "ingest": "tsx scripts/ingest-daily.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "mcp:dev": "tsx --watch mcp-server.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
     "@base-ui/react": "^1.3.0",
     "@fontsource/noto-sans-sc": "^5.2.9",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-label": "^2.1.15",
