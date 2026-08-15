@@ -3,12 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft,
   RefreshCw,
@@ -17,9 +12,11 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Download,
 } from "lucide-react";
 import { DailyView } from "@/components/daily/DailyView";
-import type { ApiCategory } from "@/lib/api-types";
+import { UploadPeriodPanel } from "@/components/cards/UploadPeriodPanel";
+import type { ApiCategory, ApiUpload } from "@/lib/api-types";
 
 interface CardDetail {
   id: string;
@@ -33,6 +30,25 @@ interface CardDetail {
     lastSyncAt: string | null;
     transactionCount: number;
   };
+}
+
+type DetailTab = "active" | "history";
+
+function uploadPeriodLabel(upload: ApiUpload): string {
+  if (upload.billingStart && upload.billingEnd) {
+    return `${upload.billingStart.slice(0, 10)} ~ ${upload.billingEnd.slice(0, 10)}`;
+  }
+  return upload.imageMonth ?? upload.originalName;
+}
+
+/** 该卡活跃流水的日期下限：所有已完成且账期解析成功账单中最大的 billingEnd。 */
+function computeCutoffDate(uploads: ApiUpload[]): string {
+  return uploads
+    .filter((u) => u.status === "DONE" && u.billingEnd)
+    .reduce((max, u) => {
+      const end = u.billingEnd!.slice(0, 10);
+      return end > max ? end : max;
+    }, "");
 }
 
 function formatCurrency(n: number): string {
@@ -57,6 +73,7 @@ export default function CardDetailPage() {
   const router = useRouter();
   const cardId = params.id as string;
 
+  const [tab, setTab] = useState<DetailTab>("active");
   const [card, setCard] = useState<CardDetail | null>(null);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,18 +86,69 @@ export default function CardDetailPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [uploads, setUploads] = useState<ApiUpload[]>([]);
+  const [selectedUploadId, setSelectedUploadId] = useState<string>("");
+  const [downloading, setDownloading] = useState(false);
+  const [reclassifying, setReclassifying] = useState(false);
+  const [reclassifyResult, setReclassifyResult] = useState<number | null>(null);
+  const [reclassifyError, setReclassifyError] = useState<string | null>(null);
+
   async function load() {
     setLoading(true);
     try {
-      const [cardRes, catRes] = await Promise.all([
+      const [cardRes, catRes, uploadsRes] = await Promise.all([
         fetch(`/api/cards/${cardId}`).then((r) => r.json()),
         fetch("/api/categories").then((r) => r.json()),
+        fetch(`/api/cards/${cardId}/uploads`).then((r) => r.json()),
       ]);
       if (cardRes.success) setCard(cardRes.data);
       if (catRes.success) setCategories(catRes.data);
+      if (uploadsRes.success) {
+        setUploads(uploadsRes.data);
+        setSelectedUploadId((prev) => prev || uploadsRes.data[0]?.id || "");
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleDownloadReport() {
+    if (!selectedUploadId) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/uploads/${selectedUploadId}/report`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("下载失败");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const selectedUpload = uploads.find((u) => u.id === selectedUploadId);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `消费报告_${selectedUpload?.billingStart?.slice(0, 10) ?? selectedUpload?.imageMonth ?? "report"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent
+    }
+    setDownloading(false);
+  }
+
+  async function handleReclassify() {
+    if (!selectedUploadId) return;
+    setReclassifying(true);
+    setReclassifyResult(null);
+    setReclassifyError(null);
+    const res = await fetch(`/api/uploads/${selectedUploadId}/reclassify`, {
+      method: "POST",
+    });
+    const json = await res.json();
+    if (json.success) {
+      setReclassifyResult(json.data.classified);
+    } else {
+      setReclassifyError(json.error ?? "分类失败");
+    }
+    setReclassifying(false);
   }
 
   useEffect(() => {
@@ -168,6 +236,8 @@ export default function CardDetailPage() {
     );
   }
 
+  const cutoffDate = computeCutoffDate(uploads);
+
   return (
     <div className="container mx-auto max-w-3xl space-y-4 p-4">
       <div className="flex items-center gap-3">
@@ -212,57 +282,175 @@ export default function CardDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={handleSync} disabled={syncing} variant="outline">
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          <span className="ml-1.5">同步日推</span>
-        </Button>
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          variant="outline"
+      <div className="flex rounded-lg border overflow-hidden text-sm">
+        <button
+          onClick={() => setTab("active")}
+          className={`flex-1 py-2 ${tab === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
         >
-          {uploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4" />
-          )}
-          <span className="ml-1.5">上传月账单</span>
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".msg"
-          className="hidden"
-          onChange={handleUpload}
-        />
+          活跃流水
+        </button>
+        <button
+          onClick={() => setTab("history")}
+          className={`flex-1 py-2 ${tab === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          历史账单
+        </button>
       </div>
 
-      {syncResult && (
-        <div
-          className={`flex items-center gap-2 rounded-md p-3 text-sm ${
-            syncResult.ok
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-              : "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400"
-          }`}
-        >
-          {syncResult.ok ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <XCircle className="h-4 w-4 shrink-0" />
+      {tab === "active" && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleSync} disabled={syncing} variant="outline">
+              <RefreshCw
+                className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}
+              />
+              <span className="ml-1.5">同步日推</span>
+            </Button>
+          </div>
+
+          {syncResult && (
+            <div
+              className={`flex items-center gap-2 rounded-md p-3 text-sm ${
+                syncResult.ok
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                  : "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400"
+              }`}
+            >
+              {syncResult.ok ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              ) : (
+                <XCircle className="h-4 w-4 shrink-0" />
+              )}
+              <span>
+                {syncResult.ok ? "同步完成：" : "同步失败："}
+                {syncResult.message}
+              </span>
+            </div>
           )}
-          <span>{syncResult.ok ? "同步完成：" : "同步失败："}{syncResult.message}</span>
-        </div>
+
+          <DailyView
+            categories={categories}
+            cardId={cardId}
+            since={cutoffDate || undefined}
+          />
+        </>
       )}
 
-      {uploadError && (
-        <div className="flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950/30 dark:text-red-400">
-          <XCircle className="h-4 w-4 shrink-0" />
-          <span>上传失败：{uploadError}</span>
-        </div>
-      )}
+      {tab === "history" && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              variant="outline"
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              <span className="ml-1.5">上传月账单</span>
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".msg"
+              className="hidden"
+              onChange={handleUpload}
+            />
+          </div>
 
-      <DailyView categories={categories} cardId={cardId} />
+          {uploadError && (
+            <div className="flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950/30 dark:text-red-400">
+              <XCircle className="h-4 w-4 shrink-0" />
+              <span>上传失败：{uploadError}</span>
+            </div>
+          )}
+
+          {uploads.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              还没有任何账单
+            </p>
+          ) : (
+            <Card>
+              <CardHeader className="pb-0">
+                <CardTitle>账单周期</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <select
+                  value={selectedUploadId}
+                  onChange={(e) => {
+                    setSelectedUploadId(e.target.value);
+                    setReclassifyResult(null);
+                    setReclassifyError(null);
+                  }}
+                  className="w-full rounded border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {uploads.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {uploadPeriodLabel(u)}
+                    </option>
+                  ))}
+                </select>
+
+                {(() => {
+                  const selectedUpload = uploads.find(
+                    (u) => u.id === selectedUploadId,
+                  );
+                  const notDone = selectedUpload?.status !== "DONE";
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadReport}
+                        disabled={downloading || notDone}
+                      >
+                        <Download
+                          className={`h-3.5 w-3.5 ${downloading ? "animate-bounce" : ""}`}
+                        />
+                        <span className="ml-1.5">
+                          {downloading ? "生成中..." : "下载报告"}
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReclassify}
+                        disabled={reclassifying}
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${reclassifying ? "animate-spin" : ""}`}
+                        />
+                        <span className="ml-1.5">
+                          {reclassifying ? "分类中..." : "重新分类"}
+                        </span>
+                      </Button>
+                    </div>
+                  );
+                })()}
+
+                {reclassifyResult !== null && (
+                  <p className="text-xs text-green-600">
+                    已分类 {reclassifyResult} 笔
+                  </p>
+                )}
+                {reclassifyError && (
+                  <p className="text-xs text-destructive">{reclassifyError}</p>
+                )}
+
+                {selectedUploadId && (
+                  <UploadPeriodPanel
+                    key={selectedUploadId}
+                    uploadId={selectedUploadId}
+                    categories={categories}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

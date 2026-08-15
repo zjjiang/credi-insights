@@ -30,22 +30,25 @@ interface ByDayResponse {
 export function DailyView({
   categories,
   cardId,
+  since,
 }: {
   categories: ApiCategory[];
   cardId?: string;
+  since?: string;
 }) {
   const [data, setData] = useState<ByDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const url = cardId
+    const base = cardId
       ? `/api/cards/${cardId}/transactions`
       : "/api/transactions/by-day";
+    const url = cardId && since ? `${base}?since=${since}` : base;
     const r = await fetch(url).then((x) => x.json());
     if (r.success) setData(r.data);
     setLoading(false);
-  }, [cardId]);
+  }, [cardId, since]);
 
   useEffect(() => {
     void load();
