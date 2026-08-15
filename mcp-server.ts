@@ -215,7 +215,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             imapHost: true,
             imapPort: true,
             imapUser: true,
-            imapTLS: true,
           },
           orderBy: { createdAt: "desc" },
         });
@@ -485,7 +484,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const rule = await prisma.rule.create({
           data: {
             name,
-            pattern,
+            description: pattern,
             categoryId,
             priority: priority ?? 0,
           },
@@ -535,7 +534,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         for (const tx of transactions) {
           for (const rule of rules) {
             try {
-              const parsed = parseRulePattern(rule.pattern);
+              const parsed = parseRulePattern(rule.description);
               if (
                 matchesRule(
                   {

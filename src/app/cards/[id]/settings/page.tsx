@@ -132,7 +132,7 @@ export default function CardSettingsPage() {
   }
 
   return (
-    <div className="container max-w-2xl py-8">
+    <div className="container mx-auto max-w-2xl py-8">
       <div className="mb-6 flex items-center gap-3">
         <Button
           variant="ghost"

@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    image: credi-insights:latest
+    container_name: credi-insights
+    restart: unless-stopped
+    ports:
+      - "8913:8913"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=8913
+      - PYTHON_BIN=/app/.venv/bin/python3
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    container_name: credi-insights-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: credi_insights
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
