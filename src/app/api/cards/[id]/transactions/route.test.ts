@@ -44,14 +44,25 @@ describe("GET /api/cards/[id]/transactions", () => {
   });
 
   it("传 since 时，用 OR 同时保留晚于 since 的交易和未关联账单的孤儿交易", async () => {
-    const { req, ctx } = makeRequest("card-1", "?since=2026-07-15&days=45");
+    // since 必须落在窗口内（晚于窗口起点）才会生效——过早的 since 会被
+    // 「只收紧不放宽」守卫忽略（见下一条用例）。这里用 now-10d 保证在窗口内。
+    const since = new Date(Date.now() - 10 * 86400_000)
+      .toISOString()
+      .slice(0, 10);
+    const { req, ctx } = makeRequest("card-1", `?since=${since}&days=45`);
     await GET(req, ctx);
 
     const call = vi.mocked(prisma.transaction.findMany).mock.calls[0][0];
     expect(call?.where).toMatchObject({
       cardId: "card-1",
       OR: [
-        { txDate: { gt: new Date("2026-07-15T00:00:00") } },
+        // txDate 分支保持既有窗口上限（lt endExclusive），孤儿分支不设日期限制
+        {
+          txDate: {
+            gt: new Date(`${since}T00:00:00`),
+            lt: expect.any(Date),
+          },
+        },
         { uploadId: null },
       ],
     });
