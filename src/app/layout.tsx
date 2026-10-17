@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
 import "./globals.css";
 import { TopNav } from "@/components/shared/TopNav";
+import { AntdProviders } from "@/components/providers/AntdProviders";
 import { AiProvider } from "@/lib/ai-context";
 import { AiSidebar } from "@/components/ai/AiSidebar";
 import { AiToggleButton } from "@/components/ai/AiToggleButton";
@@ -28,13 +30,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <AiProvider>
-          <TopNav />
-          <main className="flex-1">{children}</main>
-          <AiSidebar />
-          <AiToggleButton />
-        </AiProvider>
+      <body className="min-h-full flex flex-col">
+        <AntdRegistry>
+          <AntdProviders>
+            <AiProvider>
+              <TopNav />
+              <main className="flex-1">{children}</main>
+              <AiSidebar />
+              <AiToggleButton />
+            </AiProvider>
+          </AntdProviders>
+        </AntdRegistry>
       </body>
     </html>
   );

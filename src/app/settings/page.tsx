@@ -1,8 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  App,
+  Button,
+  Card,
+  Checkbox,
+  ColorPicker,
+  Divider,
+  Empty,
+  Form,
+  Input,
+  Select,
+  Tabs,
+  Typography,
+} from "antd";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 import type { ApiCategory } from "@/lib/api-types";
+
+const DEFAULT_COLOR = "#6366f1";
 
 interface ApiRule {
   id: string;
@@ -13,402 +35,552 @@ interface ApiRule {
   enabled: boolean;
 }
 
-type SettingsTab = "ai" | "categories" | "rules";
+interface EditCatForm {
+  name: string;
+  icon: string;
+  color: string;
+}
+
+interface AiSettingsValues {
+  ANTHROPIC_API_KEY: string;
+  AI_BASE_URL?: string;
+  AI_MODEL?: string;
+}
+
+interface CategoryFormValues {
+  icon?: string;
+  name: string;
+  color?: unknown;
+}
+
+interface RuleFormValues {
+  name: string;
+  description: string;
+  categoryId: string;
+}
+
+function toHex(color: unknown): string {
+  if (typeof color === "string") return color;
+  if (color && typeof color === "object" && "toHexString" in color) {
+    return (color as { toHexString: () => string }).toHexString();
+  }
+  return DEFAULT_COLOR;
+}
+
+function getApiError(j: unknown, fallback: string): string {
+  if (j && typeof j === "object" && "error" in j) {
+    const msg = (j as { error?: unknown }).error;
+    if (typeof msg === "string" && msg) return msg;
+  }
+  return fallback;
+}
+
+async function readJson(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<SettingsTab>("ai");
-
-  const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [aiModel, setAiModel] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
   const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [newCat, setNewCat] = useState({
-    name: "",
-    icon: "",
-    color: "#6366f1",
-  });
-  const [addingCat, setAddingCat] = useState(false);
-  const [editingCat, setEditingCat] = useState<string | null>(null);
-  const [editCatForm, setEditCatForm] = useState({
-    name: "",
-    icon: "",
-    color: "",
-  });
 
-  const [rules, setRules] = useState<ApiRule[]>([]);
-  const [newRule, setNewRule] = useState({
-    name: "",
-    description: "",
-    categoryId: "",
-  });
-  const [addingRule, setAddingRule] = useState(false);
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) setCategories(j.data);
+      })
+      .catch((err) => console.error("加载分类失败:", err));
+  }, []);
+
+  const items = [
+    {
+      key: "ai",
+      label: "AI 配置",
+      children: <AiSettingsCard />,
+      forceRender: true,
+    },
+    {
+      key: "categories",
+      label: "分类",
+      children: (
+        <CategoriesCard categories={categories} setCategories={setCategories} />
+      ),
+      forceRender: true,
+    },
+    {
+      key: "rules",
+      label: "规则",
+      children: <RulesCard categories={categories} />,
+      forceRender: true,
+    },
+  ];
+
+  return (
+    <div className="container mx-auto flex max-w-5xl flex-col gap-4 p-4 pb-24">
+      <Typography.Title level={4} style={{ margin: 0 }}>
+        设置
+      </Typography.Title>
+      <Tabs defaultActiveKey="ai" items={items} />
+    </div>
+  );
+}
+
+function AiSettingsCard() {
+  const { message } = App.useApp();
+  const [form] = Form.useForm<AiSettingsValues>();
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((j) => {
-        if (j.data?.ANTHROPIC_API_KEY) setApiKey(j.data.ANTHROPIC_API_KEY);
-        if (j.data?.AI_BASE_URL) setBaseUrl(j.data.AI_BASE_URL);
-        if (j.data?.AI_MODEL) setAiModel(j.data.AI_MODEL);
-      });
-    fetch("/api/rules")
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.success) setRules(j.data);
-      });
-    fetch("/api/categories")
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.success) setCategories(j.data);
-      });
-  }, []);
+        form.setFieldsValue({
+          ANTHROPIC_API_KEY: j.data?.ANTHROPIC_API_KEY ?? "",
+          AI_BASE_URL: j.data?.AI_BASE_URL ?? "",
+          AI_MODEL: j.data?.AI_MODEL ?? "",
+        });
+      })
+      .catch((err) => console.error("加载 AI 设置失败:", err));
+  }, [form]);
 
-  async function saveKey() {
+  async function saveSettings(values: AiSettingsValues) {
     setSaving(true);
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ANTHROPIC_API_KEY: apiKey,
-        AI_BASE_URL: baseUrl,
-        AI_MODEL: aiModel,
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const j = await readJson(res);
+      if (!res.ok || (j as { success?: boolean })?.success === false) {
+        throw new Error(getApiError(j, `保存失败（HTTP ${res.status}）`));
+      }
+      message.success("已保存");
+    } catch (err) {
+      message.error(errorMessage(err, "保存失败，请稍后重试"));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function addCategory() {
-    if (!newCat.name) return;
-    setAddingCat(true);
-    const res = await fetch("/api/categories", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newCat),
-    });
-    const j = await res.json();
-    if (j.success) {
-      setCategories((prev) => [...prev, j.data]);
-      setNewCat({ name: "", icon: "", color: "#6366f1" });
-    }
-    setAddingCat(false);
-  }
+  return (
+    <Card title="AI 配置">
+      <Typography.Paragraph type="secondary">
+        用于自动分类和账单助手。支持 Anthropic、阿里云百炼等 OpenAI
+        兼容接口。
+      </Typography.Paragraph>
+      <Form form={form} layout="vertical" onFinish={saveSettings}>
+        <Form.Item
+          name="ANTHROPIC_API_KEY"
+          label="API Key"
+          rules={[{ required: true, message: "请输入 API Key" }]}
+        >
+          <Input.Password placeholder="API Key" autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item name="AI_BASE_URL" label="Base URL">
+          <Input placeholder="如 https://dashscope.aliyuncs.com/compatible-mode/v1" />
+        </Form.Item>
+        <Form.Item name="AI_MODEL" label="模型名">
+          <Input placeholder="如 qwen-plus" />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" loading={saving}>
+          保存
+        </Button>
+      </Form>
+    </Card>
+  );
+}
+
+interface CategoriesCardProps {
+  categories: ApiCategory[];
+  setCategories: React.Dispatch<React.SetStateAction<ApiCategory[]>>;
+}
+
+function CategoriesCard({ categories, setCategories }: CategoriesCardProps) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm<CategoryFormValues>();
+  const [addingCat, setAddingCat] = useState(false);
+  const [editingCat, setEditingCat] = useState<string | null>(null);
+  const [editCatForm, setEditCatForm] = useState<EditCatForm>({
+    name: "",
+    icon: "",
+    color: DEFAULT_COLOR,
+  });
 
   function startEditCat(c: ApiCategory) {
     setEditingCat(c.id);
     setEditCatForm({
       name: c.name,
       icon: c.icon ?? "",
-      color: c.color ?? "#6366f1",
+      color: c.color ?? DEFAULT_COLOR,
     });
+  }
+
+  async function addCategory(values: CategoryFormValues) {
+    setAddingCat(true);
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          icon: values.icon ?? "",
+          color: toHex(values.color),
+        }),
+      });
+      const j = await readJson(res);
+      if (!res.ok || (j as { success?: boolean })?.success !== true) {
+        throw new Error(getApiError(j, "新增分类失败"));
+      }
+      setCategories((prev) => [...prev, (j as { data: ApiCategory }).data]);
+      form.resetFields();
+      message.success("分类已新增");
+    } catch (err) {
+      message.error(errorMessage(err, "新增分类失败，请稍后重试"));
+    } finally {
+      setAddingCat(false);
+    }
   }
 
   async function saveEditCat(id: string) {
-    await fetch(`/api/categories/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editCatForm),
-    });
-    setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...editCatForm } : c)),
-    );
-    setEditingCat(null);
+    try {
+      const res = await fetch(`/api/categories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editCatForm),
+      });
+      if (!res.ok) throw new Error(`保存失败（HTTP ${res.status}）`);
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...editCatForm } : c)),
+      );
+      setEditingCat(null);
+      message.success("分类已更新");
+    } catch (err) {
+      message.error(errorMessage(err, "保存分类失败，请稍后重试"));
+    }
   }
 
   async function deleteCat(id: string) {
-    await fetch(`/api/categories/${id}`, { method: "DELETE" });
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-  }
-
-  async function toggleRule(id: string, enabled: boolean) {
-    await fetch(`/api/rules/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled }),
-    });
-    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled } : r)));
-  }
-
-  async function deleteRule(id: string) {
-    await fetch(`/api/rules/${id}`, { method: "DELETE" });
-    setRules((prev) => prev.filter((r) => r.id !== id));
-  }
-
-  async function addRule() {
-    if (!newRule.name || !newRule.description || !newRule.categoryId) return;
-    setAddingRule(true);
-    const res = await fetch("/api/rules", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newRule),
-    });
-    const j = await res.json();
-    if (j.success) {
-      setRules((prev) => [...prev, j.data]);
-      setNewRule({ name: "", description: "", categoryId: "" });
+    try {
+      const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`删除失败（HTTP ${res.status}）`);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      message.success("分类已删除");
+    } catch (err) {
+      message.error(errorMessage(err, "删除分类失败，请稍后重试"));
     }
-    setAddingRule(false);
   }
 
   return (
-    <div className="container mx-auto max-w-5xl flex flex-col p-4 gap-4 pb-24">
-      <div className="flex rounded-lg border overflow-hidden text-xs">
-        <button
-          onClick={() => setTab("ai")}
-          className={`flex-1 py-1.5 ${tab === "ai" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          AI 配置
-        </button>
-        <button
-          onClick={() => setTab("categories")}
-          className={`flex-1 py-1.5 ${tab === "categories" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          分类
-        </button>
-        <button
-          onClick={() => setTab("rules")}
-          className={`flex-1 py-1.5 ${tab === "rules" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          规则
-        </button>
-      </div>
-
-      {tab === "ai" && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="text-sm font-semibold">AI 配置</h2>
-          <p className="text-xs text-muted-foreground">
-            用于自动分类和账单助手。支持 Anthropic、阿里云百炼等 OpenAI
-            兼容接口。
-          </p>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="API Key"
-            className="w-full rounded border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <input
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="Base URL（如 https://dashscope.aliyuncs.com/compatible-mode/v1）"
-            className="w-full rounded border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <input
-            value={aiModel}
-            onChange={(e) => setAiModel(e.target.value)}
-            placeholder="模型名（如 qwen-plus）"
-            className="w-full rounded border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <button
-            onClick={saveKey}
-            disabled={saving || !apiKey}
-            className="rounded bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-          >
-            {saved ? "已保存" : saving ? "保存中..." : "保存"}
-          </button>
+    <Card title="分类管理">
+      {categories.length === 0 ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="还没有分类"
+        />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {categories.map((c) => (
+            <CategoryRow
+              key={c.id}
+              category={c}
+              editing={editingCat === c.id}
+              editForm={editCatForm}
+              onEditFormChange={setEditCatForm}
+              onStartEdit={() => startEditCat(c)}
+              onSaveEdit={() => void saveEditCat(c.id)}
+              onCancelEdit={() => setEditingCat(null)}
+              onDelete={() => void deleteCat(c.id)}
+            />
+          ))}
         </div>
       )}
+      <Divider />
+      <Form form={form} layout="vertical" onFinish={addCategory}>
+        <div className="flex items-start gap-2">
+          <Form.Item name="icon" className="w-16" label="图标">
+            <Input placeholder="图标" maxLength={2} />
+          </Form.Item>
+          <Form.Item
+            name="name"
+            className="flex-1"
+            label="分类名称"
+            rules={[{ required: true, message: "请输入分类名称" }]}
+          >
+            <Input placeholder="分类名称" />
+          </Form.Item>
+          <Form.Item name="color" label="颜色" initialValue={DEFAULT_COLOR}>
+            <ColorPicker showText={false} disabledAlpha />
+          </Form.Item>
+        </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          htmlType="submit"
+          loading={addingCat}
+        >
+          新增分类
+        </Button>
+      </Form>
+    </Card>
+  );
+}
 
-      {tab === "categories" && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="text-sm font-semibold">分类管理</h2>
-          {categories.length === 0 && (
-            <p className="text-xs text-muted-foreground">还没有分类</p>
-          )}
-          <div className="space-y-2">
-            {categories.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-2 rounded border p-2"
-              >
-                {editingCat === c.id ? (
-                  <>
-                    <input
-                      value={editCatForm.icon}
-                      onChange={(e) =>
-                        setEditCatForm({ ...editCatForm, icon: e.target.value })
-                      }
-                      placeholder="图标"
-                      className="w-10 rounded border px-1 py-0.5 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                    <input
-                      value={editCatForm.name}
-                      onChange={(e) =>
-                        setEditCatForm({ ...editCatForm, name: e.target.value })
-                      }
-                      className="flex-1 rounded border px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                    <input
-                      type="color"
-                      value={editCatForm.color}
-                      onChange={(e) =>
-                        setEditCatForm({
-                          ...editCatForm,
-                          color: e.target.value,
-                        })
-                      }
-                      className="h-6 w-6 rounded border-0 p-0"
-                    />
-                    <button
-                      onClick={() => saveEditCat(c.id)}
-                      className="text-green-600"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setEditingCat(null)}
-                      className="text-muted-foreground"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className="w-6 h-6 rounded"
-                      style={{ background: c.color ?? "#6366f1" }}
-                    />
-                    <span className="text-sm">{c.icon}</span>
-                    <span className="flex-1 text-xs font-medium">{c.name}</span>
-                    <button
-                      onClick={() => startEditCat(c)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => deleteCat(c.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </>
-                )}
+interface CategoryRowProps {
+  category: ApiCategory;
+  editing: boolean;
+  editForm: EditCatForm;
+  onEditFormChange: (next: EditCatForm) => void;
+  onStartEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onDelete: () => void;
+}
+
+function CategoryRow({
+  category,
+  editing,
+  editForm,
+  onEditFormChange,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDelete,
+}: CategoryRowProps) {
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 rounded border border-gray-200 p-2">
+        <Input
+          size="small"
+          value={editForm.icon}
+          onChange={(e) =>
+            onEditFormChange({ ...editForm, icon: e.target.value })
+          }
+          placeholder="图标"
+          className="w-14 text-center"
+        />
+        <Input
+          size="small"
+          value={editForm.name}
+          onChange={(e) =>
+            onEditFormChange({ ...editForm, name: e.target.value })
+          }
+          className="flex-1"
+        />
+        <ColorPicker
+          size="small"
+          value={editForm.color}
+          onChange={(c) => onEditFormChange({ ...editForm, color: c.toHexString() })}
+          disabledAlpha
+        />
+        <Button
+          size="small"
+          type="text"
+          icon={<CheckOutlined style={{ color: "#52c41a" }} />}
+          onClick={onSaveEdit}
+          aria-label="保存"
+        />
+        <Button
+          size="small"
+          type="text"
+          icon={<CloseOutlined />}
+          onClick={onCancelEdit}
+          aria-label="取消"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded border border-gray-200 p-2">
+      <span
+        className="h-6 w-6 shrink-0 rounded"
+        style={{ background: category.color ?? DEFAULT_COLOR }}
+      />
+      <span className="text-sm">{category.icon}</span>
+      <span className="flex-1 truncate text-xs font-medium">
+        {category.name}
+      </span>
+      <Button
+        size="small"
+        type="text"
+        icon={<EditOutlined />}
+        onClick={onStartEdit}
+        aria-label="编辑"
+      />
+      <Button
+        size="small"
+        type="text"
+        danger
+        icon={<DeleteOutlined />}
+        onClick={onDelete}
+        aria-label="删除"
+      />
+    </div>
+  );
+}
+
+function RulesCard({ categories }: { categories: ApiCategory[] }) {
+  const { message } = App.useApp();
+  const [rules, setRules] = useState<ApiRule[]>([]);
+  const [addingRule, setAddingRule] = useState(false);
+  const [form] = Form.useForm<RuleFormValues>();
+
+  useEffect(() => {
+    fetch("/api/rules")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) setRules(j.data);
+      })
+      .catch((err) => console.error("加载规则失败:", err));
+  }, []);
+
+  async function toggleRule(id: string, enabled: boolean) {
+    try {
+      const res = await fetch(`/api/rules/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) throw new Error(`更新失败（HTTP ${res.status}）`);
+      setRules((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, enabled } : r)),
+      );
+    } catch (err) {
+      message.error(errorMessage(err, "更新规则失败，请稍后重试"));
+    }
+  }
+
+  async function deleteRule(id: string) {
+    try {
+      const res = await fetch(`/api/rules/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`删除失败（HTTP ${res.status}）`);
+      setRules((prev) => prev.filter((r) => r.id !== id));
+      message.success("规则已删除");
+    } catch (err) {
+      message.error(errorMessage(err, "删除规则失败，请稍后重试"));
+    }
+  }
+
+  async function addRule(values: RuleFormValues) {
+    setAddingRule(true);
+    try {
+      const res = await fetch("/api/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const j = await readJson(res);
+      if (!res.ok || (j as { success?: boolean })?.success !== true) {
+        throw new Error(getApiError(j, "添加规则失败"));
+      }
+      setRules((prev) => [...prev, (j as { data: ApiRule }).data]);
+      form.resetFields();
+      message.success("规则已添加");
+    } catch (err) {
+      message.error(errorMessage(err, "添加规则失败，请稍后重试"));
+    } finally {
+      setAddingRule(false);
+    }
+  }
+
+  return (
+    <Card title="分类规则">
+      <Typography.Paragraph type="secondary">
+        上传账单时 AI 会按规则自动打标分类。用自然语言描述规则即可。
+      </Typography.Paragraph>
+      {rules.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有规则" />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rules.map((r) => (
+            <div
+              key={r.id}
+              className="flex items-start gap-2 rounded border border-gray-200 p-2"
+            >
+              <Checkbox
+                checked={r.enabled}
+                onChange={(e) => void toggleRule(r.id, e.target.checked)}
+                className="mt-0.5 shrink-0"
+                aria-label={`启用规则：${r.name}`}
+              />
+              <div className="min-w-0 flex-1">
+                <Typography.Text className="text-xs font-medium">
+                  {r.name}
+                </Typography.Text>
+                <div className="truncate">
+                  <Typography.Text type="secondary" className="text-xs">
+                    {r.description}
+                  </Typography.Text>
+                </div>
+                <Typography.Text
+                  className="text-xs"
+                  style={{ color: "#1677ff" }}
+                >
+                  → {r.category.icon} {r.category.name}
+                </Typography.Text>
               </div>
-            ))}
-          </div>
-          <div className="space-y-2 border-t pt-3">
-            <div className="flex gap-2">
-              <input
-                value={newCat.icon}
-                onChange={(e) => setNewCat({ ...newCat, icon: e.target.value })}
-                placeholder="图标"
-                className="w-12 rounded border px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <input
-                value={newCat.name}
-                onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
-                placeholder="分类名称"
-                className="flex-1 rounded border px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <input
-                type="color"
-                value={newCat.color}
-                onChange={(e) =>
-                  setNewCat({ ...newCat, color: e.target.value })
-                }
-                className="h-8 w-8 rounded border-0 p-0"
+              <Button
+                size="small"
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => void deleteRule(r.id)}
+                aria-label="删除规则"
+                className="shrink-0"
               />
             </div>
-            <button
-              onClick={addCategory}
-              disabled={addingCat || !newCat.name}
-              className="flex items-center gap-1 rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
-            >
-              <Plus className="h-3 w-3" /> 新增分类
-            </button>
-          </div>
+          ))}
         </div>
       )}
-
-      {tab === "rules" && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="text-sm font-semibold">分类规则</h2>
-          <p className="text-xs text-muted-foreground">
-            上传账单时 AI 会按规则自动打标分类。用自然语言描述规则即可。
-          </p>
-          {rules.length === 0 && (
-            <p className="text-xs text-muted-foreground">还没有规则</p>
-          )}
-          <div className="space-y-2">
-            {rules.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-start gap-2 rounded border p-2"
-              >
-                <input
-                  type="checkbox"
-                  checked={r.enabled}
-                  onChange={(e) => toggleRule(r.id, e.target.checked)}
-                  className="mt-0.5 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium">{r.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {r.description}
-                  </p>
-                  <p className="text-xs text-primary">
-                    → {r.category.icon} {r.category.name}
-                  </p>
-                </div>
-                <button
-                  onClick={() => deleteRule(r.id)}
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2 border-t pt-3">
-            <input
-              value={newRule.name}
-              onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
-              placeholder="规则名称（如：咖啡规则）"
-              className="w-full rounded border px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <textarea
-              value={newRule.description}
-              onChange={(e) =>
-                setNewRule({ ...newRule, description: e.target.value })
-              }
-              placeholder="规则描述（如：商户包含星巴克、Manner、瑞幸 → 咖啡）"
-              rows={2}
-              className="w-full rounded border px-2 py-1.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <select
-              value={newRule.categoryId}
-              onChange={(e) =>
-                setNewRule({ ...newRule, categoryId: e.target.value })
-              }
-              className="w-full rounded border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="">选择目标分类...</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.icon} {c.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={addRule}
-              disabled={
-                addingRule ||
-                !newRule.name ||
-                !newRule.description ||
-                !newRule.categoryId
-              }
-              className="flex items-center gap-1 rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
-            >
-              <Plus className="h-3 w-3" /> 添加规则
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      <Divider />
+      <Form form={form} layout="vertical" onFinish={addRule}>
+        <Form.Item
+          name="name"
+          label="规则名称"
+          rules={[{ required: true, message: "请输入规则名称" }]}
+        >
+          <Input placeholder="如：咖啡规则" />
+        </Form.Item>
+        <Form.Item
+          name="description"
+          label="规则描述"
+          rules={[{ required: true, message: "请输入规则描述" }]}
+        >
+          <Input.TextArea
+            rows={2}
+            placeholder="如：商户包含星巴克、Manner、瑞幸 → 咖啡"
+          />
+        </Form.Item>
+        <Form.Item
+          name="categoryId"
+          label="目标分类"
+          rules={[{ required: true, message: "请选择目标分类" }]}
+        >
+          <Select
+            placeholder="选择目标分类..."
+            options={categories.map((c) => ({
+              value: c.id,
+              label: `${c.icon} ${c.name}`,
+            }))}
+          />
+        </Form.Item>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          htmlType="submit"
+          loading={addingRule}
+        >
+          添加规则
+        </Button>
+      </Form>
+    </Card>
   );
 }

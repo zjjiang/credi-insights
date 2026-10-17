@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
 import { TransactionList } from "@/components/transactions/TransactionList";
-
+import { StatusTag } from "@/components/shared/StatusTag";
 
 import type { ApiUpload, ApiCategory } from "@/lib/api-types";
 
@@ -25,19 +24,25 @@ export default async function UploadDetailPage({
   params: Promise<{ uploadId: string }>;
 }) {
   const { uploadId } = await params;
-  const [upload, categories] = await Promise.all([getUpload(uploadId), getCategories()]);
+  const [upload, categories] = await Promise.all([
+    getUpload(uploadId),
+    getCategories(),
+  ]);
 
   if (!upload) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">找不到该上传记录</p>
+        <p className="text-sm text-gray-400">找不到该上传记录</p>
       </div>
     );
   }
 
   const title = [
     upload.imageMonth
-      ? new Date(upload.imageMonth + "-01").toLocaleDateString("zh-CN", { year: "numeric", month: "long" })
+      ? new Date(upload.imageMonth + "-01").toLocaleDateString("zh-CN", {
+          year: "numeric",
+          month: "long",
+        })
       : null,
     upload.cardLast4 ? `信用卡${upload.cardLast4}` : null,
   ]
@@ -46,23 +51,19 @@ export default async function UploadDetailPage({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-4 py-3">
+      <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-white px-4 py-3">
         <Link
           href="/history"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <span className="text-xs">←</span>
           历史记录
         </Link>
-        <span className="ml-auto text-sm font-medium">{title || upload.originalName}</span>
+        <span className="ml-auto truncate text-sm font-medium">{title || upload.originalName}</span>
       </div>
 
       <div className="p-4">
-        {upload.status !== "DONE" && (
-          <div className="mb-4 text-sm text-muted-foreground">
-            {upload.status === "FAILED" ? "解析失败" : "处理中..."}
-          </div>
-        )}
+        {upload.status !== "DONE" && <StatusTag status={upload.status} />}
         <TransactionList
           transactions={upload.transactions ?? []}
           categories={categories}

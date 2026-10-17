@@ -2,18 +2,14 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, Button, Card, Select, Tabs, Typography } from "antd";
 import {
-  ArrowLeft,
-  RefreshCw,
-  Settings,
-  Upload,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Download,
-} from "lucide-react";
+  ArrowLeftOutlined,
+  SettingOutlined,
+  SyncOutlined,
+  UploadOutlined,
+  DownloadOutlined,
+} from "@ant-design/icons";
 import { DailyView } from "@/components/daily/DailyView";
 import { UploadPeriodPanel } from "@/components/cards/UploadPeriodPanel";
 import type { ApiCategory, ApiUpload } from "@/lib/api-types";
@@ -219,9 +215,7 @@ export default function CardDetailPage() {
   if (loading) {
     return (
       <div className="container mx-auto max-w-3xl p-4">
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          加载中...
-        </p>
+        <p className="py-8 text-center text-sm text-gray-500">加载中...</p>
       </div>
     );
   }
@@ -229,103 +223,36 @@ export default function CardDetailPage() {
   if (!card) {
     return (
       <div className="container mx-auto max-w-3xl p-4">
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          卡片不存在
-        </p>
+        <p className="py-8 text-center text-sm text-gray-500">卡片不存在</p>
       </div>
     );
   }
 
   const cutoffDate = computeCutoffDate(uploads);
 
-  return (
-    <div className="container mx-auto max-w-3xl space-y-4 p-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon-sm" onClick={() => router.push("/")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold">
-            {card.alias || `${card.bank} ${card.cardLast4}`}
-          </h1>
-          <p className="truncate text-sm text-muted-foreground">
-            {card.bank} · 尾号 {card.cardLast4}
-            {card.billingDay && ` · 账单日 ${card.billingDay} 号`}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => router.push(`/cards/${cardId}/settings`)}
-          aria-label="卡片设置"
-        >
-          <Settings className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader className="pb-0">
-          <CardTitle>本月概览</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground">本月支出</p>
-            <p className="text-2xl font-semibold tabular-nums">
-              ¥{formatCurrency(card.stats.monthlyTotal)}
-            </p>
-          </div>
-          <p className="text-right text-xs text-muted-foreground">
-            最近同步
-            <br />
-            {formatSyncTime(card.stats.lastSyncAt)}
-          </p>
-        </CardContent>
-      </Card>
-
-      <div className="flex rounded-lg border overflow-hidden text-sm">
-        <button
-          onClick={() => setTab("active")}
-          className={`flex-1 py-2 ${tab === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          活跃流水
-        </button>
-        <button
-          onClick={() => setTab("history")}
-          className={`flex-1 py-2 ${tab === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          历史账单
-        </button>
-      </div>
-
-      {tab === "active" && (
-        <>
+  const tabItems = [
+    {
+      key: "active",
+      label: "活跃流水",
+      children: (
+        <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={handleSync} disabled={syncing} variant="outline">
-              <RefreshCw
-                className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}
-              />
-              <span className="ml-1.5">同步日推</span>
+            <Button
+              icon={<SyncOutlined />}
+              onClick={handleSync}
+              loading={syncing}
+            >
+              同步日推
             </Button>
           </div>
 
           {syncResult && (
-            <div
-              className={`flex items-center gap-2 rounded-md p-3 text-sm ${
-                syncResult.ok
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                  : "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400"
-              }`}
-            >
-              {syncResult.ok ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-              ) : (
-                <XCircle className="h-4 w-4 shrink-0" />
-              )}
-              <span>
-                {syncResult.ok ? "同步完成：" : "同步失败："}
-                {syncResult.message}
-              </span>
-            </div>
+            <Alert
+              showIcon
+              type={syncResult.ok ? "success" : "error"}
+              message={syncResult.ok ? "同步完成" : "同步失败"}
+              description={syncResult.message}
+            />
           )}
 
           <DailyView
@@ -333,23 +260,21 @@ export default function CardDetailPage() {
             cardId={cardId}
             since={cutoffDate || undefined}
           />
-        </>
-      )}
-
-      {tab === "history" && (
-        <>
+        </div>
+      ),
+    },
+    {
+      key: "history",
+      label: "历史账单",
+      children: (
+        <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Button
+              icon={<UploadOutlined />}
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              variant="outline"
+              loading={uploading}
             >
-              {uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              <span className="ml-1.5">上传月账单</span>
+              上传月账单
             </Button>
             <input
               ref={fileInputRef}
@@ -361,37 +286,29 @@ export default function CardDetailPage() {
           </div>
 
           {uploadError && (
-            <div className="flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950/30 dark:text-red-400">
-              <XCircle className="h-4 w-4 shrink-0" />
-              <span>上传失败：{uploadError}</span>
-            </div>
+            <Alert showIcon type="error" message={`上传失败：${uploadError}`} />
           )}
 
           {uploads.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
+            <p className="py-8 text-center text-sm text-gray-500">
               还没有任何账单
             </p>
           ) : (
-            <Card>
-              <CardHeader className="pb-0">
-                <CardTitle>账单周期</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <select
+            <Card title="账单周期">
+              <div className="space-y-3">
+                <Select
                   value={selectedUploadId}
-                  onChange={(e) => {
-                    setSelectedUploadId(e.target.value);
+                  onChange={(value) => {
+                    setSelectedUploadId(value);
                     setReclassifyResult(null);
                     setReclassifyError(null);
                   }}
-                  className="w-full rounded border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {uploads.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {uploadPeriodLabel(u)}
-                    </option>
-                  ))}
-                </select>
+                  options={uploads.map((u) => ({
+                    value: u.id,
+                    label: uploadPeriodLabel(u),
+                  }))}
+                  style={{ width: "100%" }}
+                />
 
                 {(() => {
                   const selectedUpload = uploads.find(
@@ -401,42 +318,35 @@ export default function CardDetailPage() {
                   return (
                     <div className="flex flex-wrap gap-2">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        size="small"
+                        icon={<DownloadOutlined />}
                         onClick={handleDownloadReport}
-                        disabled={downloading || notDone}
+                        loading={downloading}
+                        disabled={notDone}
                       >
-                        <Download
-                          className={`h-3.5 w-3.5 ${downloading ? "animate-bounce" : ""}`}
-                        />
-                        <span className="ml-1.5">
-                          {downloading ? "生成中..." : "下载报告"}
-                        </span>
+                        下载报告
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        size="small"
+                        icon={<SyncOutlined />}
                         onClick={handleReclassify}
-                        disabled={reclassifying}
+                        loading={reclassifying}
                       >
-                        <RefreshCw
-                          className={`h-3.5 w-3.5 ${reclassifying ? "animate-spin" : ""}`}
-                        />
-                        <span className="ml-1.5">
-                          {reclassifying ? "分类中..." : "重新分类"}
-                        </span>
+                        重新分类
                       </Button>
                     </div>
                   );
                 })()}
 
                 {reclassifyResult !== null && (
-                  <p className="text-xs text-green-600">
+                  <Typography.Text type="success" className="text-xs">
                     已分类 {reclassifyResult} 笔
-                  </p>
+                  </Typography.Text>
                 )}
                 {reclassifyError && (
-                  <p className="text-xs text-destructive">{reclassifyError}</p>
+                  <Typography.Text type="danger" className="text-xs">
+                    {reclassifyError}
+                  </Typography.Text>
                 )}
 
                 {selectedUploadId && (
@@ -446,11 +356,63 @@ export default function CardDetailPage() {
                     categories={categories}
                   />
                 )}
-              </CardContent>
+              </div>
             </Card>
           )}
-        </>
-      )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="container mx-auto max-w-3xl space-y-4 p-4">
+      <div className="flex items-center gap-3">
+        <Button
+          type="link"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => router.push("/")}
+          aria-label="返回首页"
+        />
+        <div className="min-w-0 flex-1">
+          <Typography.Title level={4} ellipsis style={{ marginBottom: 0 }}>
+            {card.alias || `${card.bank} ${card.cardLast4}`}
+          </Typography.Title>
+          <Typography.Text type="secondary" className="block truncate text-sm">
+            {card.bank} · 尾号 {card.cardLast4}
+            {card.billingDay && ` · 账单日 ${card.billingDay} 号`}
+          </Typography.Text>
+        </div>
+        <Button
+          type="text"
+          icon={<SettingOutlined />}
+          onClick={() => router.push(`/cards/${cardId}/settings`)}
+          aria-label="卡片设置"
+        />
+      </div>
+
+      <Card title="本月概览">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <Typography.Text type="secondary" className="text-xs">
+              本月支出
+            </Typography.Text>
+            <p className="text-2xl font-semibold tabular-nums">
+              ¥{formatCurrency(card.stats.monthlyTotal)}
+            </p>
+          </div>
+          <Typography.Text type="secondary" className="text-right text-xs">
+            最近同步
+            <br />
+            {formatSyncTime(card.stats.lastSyncAt)}
+          </Typography.Text>
+        </div>
+      </Card>
+
+      <Tabs
+        activeKey={tab}
+        onChange={(key) => setTab(key as DetailTab)}
+        items={tabItems}
+      />
     </div>
   );
 }
