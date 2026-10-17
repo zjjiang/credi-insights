@@ -108,6 +108,7 @@ model Rule {
   id          String   @id @default(cuid())
   name        String
   description String   @db.Text
+  pattern     String?  @db.Text // 结构化匹配规则，如 "merchant contains 美团"（MCP apply_rules 用）
   categoryId  String
   category    Category @relation(fields: [categoryId], references: [id])
   priority    Int      @default(0)

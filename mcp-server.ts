@@ -7,6 +7,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { prisma } from "./src/lib/db.js";
+import type { Prisma } from "./src/generated/prisma/client.js";
 import { parseRulePattern, matchesRule } from "./src/lib/rule-parser.js";
 import { runDailyIngest } from "./src/lib/imap/ingest.js";
 
@@ -215,7 +216,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             imapHost: true,
             imapPort: true,
             imapUser: true,
-            imapTLS: true,
           },
           orderBy: { createdAt: "desc" },
         });
@@ -240,7 +240,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error("Invalid endDate format. Expected YYYY-MM-DD");
         }
 
-        const where: any = {};
+        const where: Prisma.TransactionWhereInput = {};
         if (cardId) where.cardId = cardId;
         if (categoryId) where.categoryId = categoryId;
         if (startDate || endDate) {
@@ -485,6 +485,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const rule = await prisma.rule.create({
           data: {
             name,
+            // description 必填（App 的 AI 分类提示词用到），pattern 同时兜底
+            description: pattern,
             pattern,
             categoryId,
             priority: priority ?? 0,
@@ -511,7 +513,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         });
 
         // Fetch uncategorized transactions
-        const where: any = { categoryId: null };
+        const where: Prisma.TransactionWhereInput = { categoryId: null };
         if (cardId) where.cardId = cardId;
 
         const transactions = await prisma.transaction.findMany({
@@ -534,6 +536,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Apply rules to each transaction
         for (const tx of transactions) {
           for (const rule of rules) {
+            // 仅自然语言描述的规则无法做确定性匹配，跳过
+            if (!rule.pattern) continue;
             try {
               const parsed = parseRulePattern(rule.pattern);
               if (
