@@ -27,4 +27,4 @@
 
 - [x] 4.1 `tsc --noEmit`、`npm run lint`、`npm test`（55 用例）全绿
 - [x] 4.2 `npm run build` 成功，dev 起服后逐页目检（亮色/375px/表格滚动/反馈消息）
-- [ ] 4.3 提交、推送并创建 PR
+- [x] 4.3 提交、推送并创建 PR
