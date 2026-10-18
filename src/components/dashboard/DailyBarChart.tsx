@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { CHART_NEGATIVE, CHART_POSITIVE } from "@/lib/chart-colors";
 
 interface DayData {
   date: string;
@@ -56,13 +57,13 @@ export function DailyBarChart({ byDay }: DailyBarChartProps) {
             <Bar
               dataKey="debit"
               name="debit"
-              fill="#ef4444"
+              fill={CHART_NEGATIVE}
               radius={[3, 3, 0, 0]}
             />
             <Bar
               dataKey="credit"
               name="credit"
-              fill="#10b981"
+              fill={CHART_POSITIVE}
               radius={[3, 3, 0, 0]}
             />
           </BarChart>

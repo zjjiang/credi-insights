@@ -2,40 +2,50 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Settings } from "lucide-react";
+import { Menu } from "antd";
+import { HomeOutlined, SettingOutlined } from "@ant-design/icons";
+import type { MenuProps } from "antd";
 
-const navItems = [
-  { href: "/", label: "首页", icon: Home },
-  { href: "/settings", label: "设置", icon: Settings },
+const navItems: Required<MenuProps>["items"] = [
+  {
+    key: "/",
+    label: (
+      <Link href="/" style={{ display: "inline-block" }}>
+        首页
+      </Link>
+    ),
+    icon: <HomeOutlined />,
+  },
+  {
+    key: "/settings",
+    label: (
+      <Link href="/settings" style={{ display: "inline-block" }}>
+        设置
+      </Link>
+    ),
+    icon: <SettingOutlined />,
+  },
 ];
 
 export function TopNav() {
   const pathname = usePathname();
 
+  const selectedKey = navItems
+    .map((item) => String(item!.key))
+    .find((key) => (key === "/" ? pathname === "/" : pathname.startsWith(key)));
+
   return (
-    <nav className="w-full border-b bg-background">
+    <nav className="w-full border-b bg-white">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
-        <span className="text-sm font-semibold">Credi Insights</span>
-        <div className="flex items-center gap-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const active =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
-                  active
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
-        </div>
+        <span className="text-sm font-semibold whitespace-nowrap">
+          Credi Insights
+        </span>
+        <Menu
+          mode="horizontal"
+          selectedKeys={selectedKey ? [selectedKey] : []}
+          items={navItems}
+          style={{ flex: 1, minWidth: 0, borderBottom: "none" }}
+        />
       </div>
     </nav>
   );

@@ -1,6 +1,8 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button, DatePicker } from "antd";
+import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import dayjs, { type Dayjs } from "dayjs";
 
 interface MonthSelectorProps {
   year: number;
@@ -9,43 +11,42 @@ interface MonthSelectorProps {
 }
 
 export function MonthSelector({ year, month, onChange }: MonthSelectorProps) {
-  function prev() {
-    if (month === 1) {
-      onChange(year - 1, 12);
-    } else {
-      onChange(year, month - 1);
-    }
+  const value = dayjs().year(year).month(month - 1).date(1);
+
+  function shift(delta: number) {
+    const next = value.add(delta, "month");
+    onChange(next.year(), next.month() + 1);
   }
 
-  function next() {
-    if (month === 12) {
-      onChange(year + 1, 1);
-    } else {
-      onChange(year, month + 1);
-    }
+  function handlePick(d: Dayjs | null) {
+    if (!d) return;
+    onChange(d.year(), d.month() + 1);
   }
-
-  const label = `${year}年${String(month).padStart(2, "0")}月`;
 
   return (
-    <div className="flex items-center gap-4">
-      <button
-        onClick={prev}
-        className="rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
+    <div className="flex items-center gap-2">
+      <Button
+        type="text"
+        shape="circle"
+        icon={<LeftOutlined />}
+        onClick={() => shift(-1)}
         aria-label="上个月"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-      <span className="min-w-[7rem] text-center text-base font-medium">
-        {label}
-      </span>
-      <button
-        onClick={next}
-        className="rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
+      />
+      <DatePicker
+        picker="month"
+        value={value}
+        allowClear={false}
+        format="YYYY年MM月"
+        onChange={handlePick}
+        style={{ width: 120 }}
+      />
+      <Button
+        type="text"
+        shape="circle"
+        icon={<RightOutlined />}
+        onClick={() => shift(1)}
         aria-label="下个月"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
+      />
     </div>
   );
 }

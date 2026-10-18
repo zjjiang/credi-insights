@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Empty, Spin } from "antd";
 import type { ApiCategory } from "@/lib/api-types";
 import { DayCard } from "./DayCard";
 
@@ -57,16 +58,17 @@ export function DailyView({
 
   if (loading) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        加载中...
-      </p>
+      <div className="flex justify-center py-8">
+        <Spin />
+      </div>
     );
   }
   if (!data || data.days.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        暂无交易数据。配置 IMAP 后同步即可。
-      </p>
+      <Empty
+        className="py-8"
+        description="暂无交易数据。配置 IMAP 后同步即可。"
+      />
     );
   }
 

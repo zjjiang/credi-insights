@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Trash2 } from "lucide-react";
+import { App, Button, Select, Tag } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
 import type { ApiCategory } from "@/lib/api-types";
 
 interface DayTx {
@@ -88,59 +88,83 @@ function TxRow({
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const { modal, message } = App.useApp();
 
   async function patchCategory(categoryId: string) {
     setBusy(true);
     try {
-      await fetch(`/api/transactions/${tx.id}`, {
+      const res = await fetch(`/api/transactions/${tx.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId: categoryId || null }),
       });
+      if (!res.ok) {
+        message.error("分类更新失败，请重试");
+        return;
+      }
       onChanged();
+    } catch {
+      message.error("网络异常，分类更新失败");
     } finally {
       setBusy(false);
     }
   }
 
-  async function remove() {
-    if (!confirm(`删除「${tx.merchant}」这笔记录？`)) return;
-    setBusy(true);
-    try {
-      await fetch(`/api/transactions/${tx.id}`, { method: "DELETE" });
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
+  function remove() {
+    modal.confirm({
+      title: "删除交易记录",
+      content: `删除「${tx.merchant}」这笔记录？`,
+      okText: "删除",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: async () => {
+        setBusy(true);
+        try {
+          const res = await fetch(`/api/transactions/${tx.id}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) {
+            message.error("删除失败，请重试");
+            return;
+          }
+          message.success("已删除");
+          onChanged();
+        } catch {
+          message.error("网络异常，删除失败");
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   }
 
   const stale = isStale(dayDate, tx.source);
+
+  const categoryOptions = [
+    { value: "", label: "未分类" },
+    ...categories.map((c) => ({
+      value: c.id,
+      label: `${c.icon ? `${c.icon} ` : ""}${c.name}`,
+    })),
+  ];
 
   return (
     <li className="flex items-center gap-2 px-3 py-2 text-sm">
       <span className="min-w-0 flex-1 truncate">{tx.merchant}</span>
       {stale && (
-        <Badge
-          variant="outline"
-          className="shrink-0 border-red-300 text-[10px] text-red-500"
-        >
+        <Tag color="error" className="shrink-0">
           陈旧未对账
-        </Badge>
+        </Tag>
       )}
-      <select
-        className="w-20 shrink-0 rounded border bg-background px-1 py-0.5 text-xs text-muted-foreground"
+      <Select
+        size="small"
+        className="shrink-0"
+        style={{ width: 112 }}
         value={tx.categoryId ?? ""}
+        options={categoryOptions}
         disabled={busy}
-        onChange={(e) => patchCategory(e.target.value)}
-      >
-        <option value="">未分类</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.icon ? `${c.icon} ` : ""}
-            {c.name}
-          </option>
-        ))}
-      </select>
+        onChange={(value) => void patchCategory(value)}
+      />
       <span
         className={`shrink-0 tabular-nums font-medium ${
           tx.type === "CREDIT" ? "text-emerald-600" : "text-foreground"
@@ -149,14 +173,15 @@ function TxRow({
         {tx.type === "CREDIT" ? "+" : "-"}
         {fmt(tx.amount)}
       </span>
-      <button
-        className="shrink-0 text-muted-foreground hover:text-red-500"
+      <Button
+        type="text"
+        danger
+        size="small"
+        icon={<DeleteOutlined />}
         disabled={busy}
         onClick={remove}
         aria-label="删除"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      />
     </li>
   );
 }
