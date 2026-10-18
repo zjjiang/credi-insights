@@ -48,6 +48,8 @@ const listCards: AiTool = {
       bank: c.bank,
       cardLast4: c.cardLast4,
       alias: c.alias,
+      billingDay: c.billingDay,
+      dueDay: c.dueDay,
       isActive: c.isActive,
     }));
   },
